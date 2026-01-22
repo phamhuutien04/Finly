@@ -1,10 +1,18 @@
-// https://docs.expo.dev/guides/using-eslint/
-const { defineConfig } = require('eslint/config');
-const expoConfig = require('eslint-config-expo/flat');
+const expo = require("eslint-config-expo/flat");
 
-module.exports = defineConfig([
-  expoConfig,
+module.exports = [
+  ...expo,
   {
-    ignores: ['dist/*'],
+    settings: {
+      // BỎ QUA victory-native khi check unresolved import
+      "import/ignore": ["victory-native"],
+
+      "import/resolver": {
+        typescript: {
+          project: "./tsconfig.json",
+        },
+        node: true,
+      },
+    },
   },
-]);
+];

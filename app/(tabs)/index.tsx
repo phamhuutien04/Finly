@@ -1,98 +1,300 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import React from 'react';
+import { StyleSheet, View, Pressable, FlatList } from 'react-native';
 import { Link } from 'expo-router';
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+type TxType = 'income' | 'expense';
+
+type Transaction = {
+  id: string;
+  title: string;
+  category: string;
+  type: TxType;
+  amount: number; // VND
+  time: string; // "Hôm nay • 08:30"
+};
+
+const transactions: Transaction[] = [
+  { id: '1', title: 'Trà sữa', category: 'Ăn uống', type: 'expense', amount: 35000, time: 'Hôm nay • 09:10' },
+  { id: '2', title: 'Lương', category: 'Thu nhập', type: 'income', amount: 6500000, time: 'Hôm qua • 18:22' },
+  { id: '3', title: 'Grab', category: 'Di chuyển', type: 'expense', amount: 52000, time: 'Hôm qua • 12:01' },
+  { id: '4', title: 'Mua sách', category: 'Học tập', type: 'expense', amount: 120000, time: '2 ngày trước • 20:15' },
+];
+
+const formatVND = (n: number) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
+
+function getMonthLabel() {
+  const d = new Date();
+  const m = d.getMonth() + 1;
+  const y = d.getFullYear();
+  return `Tháng ${m}/${y}`;
+}
+
+export default function HomeScreen() {
+  // Demo tổng hợp (bạn thay bằng data thật sau)
+  const income = 6500000;
+  const expense = 35000 + 52000 + 120000;
+  const balance = income - expense;
+
+  return (
+    <ThemedView style={styles.screen}>
+      {/* Header */}
+      <ThemedView style={styles.header}>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="title">Tổng quan</ThemedText>
+          <ThemedText style={styles.muted}>{getMonthLabel()}</ThemedText>
+        </View>
+
+        {/* Nút đi tới screen thêm giao dịch (bạn tạo route sau) */}
+        <Link href="/modal" asChild>
+          <Pressable style={styles.addBtn}>
+            <ThemedText style={styles.addBtnText}>+ Thêm</ThemedText>
+          </Pressable>
+        </Link>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
+
+      {/* Summary cards */}
+      <View style={styles.row}>
+        <SummaryCard label="Số dư" value={formatVND(balance)} tone="primary" />
+        <SummaryCard label="Thu nhập" value={formatVND(income)} tone="success" />
+        <SummaryCard label="Chi tiêu" value={formatVND(expense)} tone="danger" />
+      </View>
+
+      {/* Quick actions */}
+      <ThemedView style={styles.sectionHeader}>
+        <ThemedText type="subtitle">Thao tác nhanh</ThemedText>
       </ThemedView>
-    </ParallaxScrollView>
+
+      <View style={styles.grid}>
+        <QuickAction title="Thêm thu" subtitle="Ghi khoản thu" emoji="💰" href="/modal" />
+        <QuickAction title="Thêm chi" subtitle="Ghi khoản chi" emoji="🧾" href="/modal" />
+        <QuickAction title="Báo cáo" subtitle="Xem biểu đồ" emoji="📊" href="/explore" />
+        <QuickAction title="Ngân sách" subtitle="Theo dõi limit" emoji="🎯" href="/explore" />
+      </View>
+
+      {/* Recent transactions */}
+      <ThemedView style={styles.sectionHeader}>
+        <View style={{ flex: 1 }}>
+          <ThemedText type="subtitle">Giao dịch gần đây</ThemedText>
+          <ThemedText style={styles.muted}>Cập nhật mới nhất</ThemedText>
+        </View>
+
+        <Link href="/explore" asChild>
+          <Pressable hitSlop={10}>
+            <ThemedText style={styles.linkText}>Xem tất cả</ThemedText>
+          </Pressable>
+        </Link>
+      </ThemedView>
+
+      <FlatList
+        data={transactions}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ paddingBottom: 24 }}
+        ItemSeparatorComponent={() => <View style={styles.sep} />}
+        renderItem={({ item }) => <TransactionRow tx={item} />}
+        showsVerticalScrollIndicator={false}
+      />
+    </ThemedView>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: 'primary' | 'success' | 'danger';
+}) {
+  return (
+    <ThemedView style={[styles.card, tone === 'primary' && styles.cardPrimary, tone === 'success' && styles.cardSuccess, tone === 'danger' && styles.cardDanger]}>
+      <ThemedText style={styles.cardLabel}>{label}</ThemedText>
+      <ThemedText style={styles.cardValue}>{value}</ThemedText>
+    </ThemedView>
+  );
+}
+
+function QuickAction({
+  title,
+  subtitle,
+  emoji,
+  href,
+}: {
+  title: string;
+  subtitle: string;
+  emoji: string;
+  href: string;
+}) {
+  return (
+    <Link href={href as any} asChild>
+      <Pressable style={styles.actionCard}>
+        <ThemedText style={styles.actionEmoji}>{emoji}</ThemedText>
+        <ThemedText style={styles.actionTitle}>{title}</ThemedText>
+        <ThemedText style={styles.actionSub}>{subtitle}</ThemedText>
+      </Pressable>
+    </Link>
+  );
+}
+
+function TransactionRow({ tx }: { tx: Transaction }) {
+  const isIncome = tx.type === 'income';
+  return (
+    <ThemedView style={styles.txRow}>
+      <View style={styles.txIcon}>
+        <ThemedText style={{ fontSize: 16 }}>{isIncome ? '⬆️' : '⬇️'}</ThemedText>
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <ThemedText style={styles.txTitle}>{tx.title}</ThemedText>
+        <ThemedText style={styles.muted}>{tx.category} • {tx.time}</ThemedText>
+      </View>
+
+      <ThemedText style={[styles.txAmount, isIncome ? styles.incomeText : styles.expenseText]}>
+        {isIncome ? '+' : '-'} {formatVND(tx.amount)}
+      </ThemedText>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  screen: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+  },
+
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    marginBottom: 12,
   },
-  stepContainer: {
-    gap: 8,
+
+  muted: {
+    opacity: 0.7,
+    marginTop: 2,
+  },
+
+  addBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.35)',
+  },
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+
+  card: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.25)',
+  },
+  cardPrimary: {},
+  cardSuccess: {},
+  cardDanger: {},
+
+  cardLabel: {
+    fontSize: 12,
+    opacity: 0.75,
+    marginBottom: 6,
+  },
+  cardValue: {
+    fontSize: 14,
+    fontWeight: '800',
+  },
+
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 12,
+    marginTop: 6,
+    marginBottom: 10,
+  },
+
+  linkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    opacity: 0.85,
+  },
+
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+
+  actionCard: {
+    width: '48%',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.25)',
+  },
+  actionEmoji: {
+    fontSize: 20,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  actionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  actionSub: {
+    fontSize: 12,
+    opacity: 0.75,
+  },
+
+  sep: {
+    height: 10,
+  },
+
+  txRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.25)',
+  },
+  txIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(127,127,127,0.25)',
+  },
+  txTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  txAmount: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  incomeText: {
+    opacity: 0.9,
+  },
+  expenseText: {
+    opacity: 0.9,
   },
 });
