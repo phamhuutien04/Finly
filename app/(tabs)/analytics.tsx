@@ -108,7 +108,6 @@ console.log("VictoryChart:", VictoryChart);
     <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, gap: 12 }}>
       <View style={{ gap: 6 }}>
         <Text style={{ fontSize: 24, fontWeight: "900", color: text }}>Thống kê</Text>
-        <Text style={{ color: text + "AA" }}>Mobile dùng victory-native</Text>
       </View>
 
       <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
