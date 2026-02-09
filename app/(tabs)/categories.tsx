@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -10,6 +11,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  Dimensions,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 
@@ -17,113 +19,145 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { supabase } from "@/lib/supabase";
 
+const { width } = Dimensions.get("window");
+
 type CategoryType = "expense" | "income";
 
 type CategoryRow = {
-  id: number; // DB trả number nhưng khi query bigint đôi khi cần string -> sẽ convert khi dùng
+  id: number;
   user_id?: string | null;
   name?: string | null;
   type?: CategoryType | string | null;
-  emoji: string | null;
-  icon_uri: string | null;
-  icon_preset_id: string | null;
-  created_at: string | null;
+  emoji?: string | null;
+  icon_uri?: string | null;
+  icon_preset_id?: string | null;
+  created_at?: string | null;
+  total_amount?: number | null;
 };
 
 type IconFromDb = { id: string; uri: string; label: string };
 
 const normalizeType = (t: any): CategoryType => (t === "income" ? "income" : "expense");
 
+const formatVND = (n: number) =>
+  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+
 export default function CategoriesScreen() {
   const [activeType, setActiveType] = useState<CategoryType>("expense");
   const [q, setQ] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
 
-  // modal
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  const currentDay = now.getDate();
+
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedDay, setSelectedDay] = useState(currentDay);
+  const [filterMode, setFilterMode] = useState<"today" | "month" | "year" | "custom">("month");
+
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
-
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("");
   const [formType, setFormType] = useState<CategoryType>("expense");
-
   const [iconUri, setIconUri] = useState<string>("");
+  const [uploadedIconUrl, setUploadedIconUrl] = useState<string>("");
   const [iconPresetId, setIconPresetId] = useState<string>("");
 
+  const router = useRouter();
+
   const getUserId = async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) return null;
-    return data.user.id;
+    const { data } = await supabase.auth.getUser();
+    return data.user?.id ?? null;
+  };
+
+  const getDateRangeISO = () => {
+    let start: Date;
+    let end: Date = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+
+    if (filterMode === "today") {
+      start = new Date(selectedYear, selectedMonth - 1, selectedDay, 0, 0, 0);
+      end = new Date(selectedYear, selectedMonth - 1, selectedDay, 23, 59, 59, 999);
+    } else if (filterMode === "month") {
+      start = new Date(selectedYear, selectedMonth - 1, 1);
+    } else if (filterMode === "year") {
+      start = new Date(selectedYear, 0, 1);
+      end = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
+    } else {
+      start = new Date(selectedYear, selectedMonth - 1, 1);
+    }
+
+    return { startISO: start.toISOString(), endISO: end.toISOString() };
   };
 
   const fetchCategories = async () => {
     setLoading(true);
-
     const uid = await getUserId();
     const selectCols = "id, user_id, name, type, emoji, icon_uri, icon_preset_id, created_at";
 
-    // ưu tiên theo user_id nếu có
-    if (uid) {
-      const { data, error } = await supabase
-        .from("categories")
-        .select(selectCols)
+    try {
+      let query = supabase.from("categories").select(selectCols);
+      if (uid) query = query.eq("user_id", uid);
+
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error) throw error;
+
+      const { startISO, endISO } = getDateRangeISO();
+      const { data: txData } = await supabase
+        .from("transactions")
+        .select("category_id, type, amount")
         .eq("user_id", uid)
-        .order("id", { ascending: true });
+        .gte("transaction_date", startISO)
+        .lt("transaction_date", endISO);
 
-      if (!error) {
-        setCategories((data as CategoryRow[]) ?? []);
-        setLoading(false);
-        return;
-      }
+      const categoryTotals: Record<number, number> = {};
+      let income = 0;
+      let expense = 0;
 
-      const msg = (error.message || "").toLowerCase();
-      const noUserIdCol =
-        msg.includes("column") && msg.includes("user_id") && msg.includes("does not exist");
-      if (!noUserIdCol) {
-        Alert.alert("Lỗi tải danh mục", error.message);
-        setLoading(false);
-        return;
-      }
-    }
+      txData?.forEach((t) => {
+        const amt = Number(t.amount ?? 0);
+        if (t.type === "income") income += amt;
+        else expense += amt;
 
-    // fallback: lấy tất cả
-    const { data: data2, error: error2 } = await supabase
-      .from("categories")
-      .select(selectCols)
-      .order("id", { ascending: true });
+        const catId = t.category_id;
+        if (catId) {
+          categoryTotals[catId] = (categoryTotals[catId] || 0) + (t.type === "income" ? amt : -amt);
+        }
+      });
 
-    if (error2) {
-      Alert.alert("Lỗi tải danh mục", error2.message);
+      setTotalIncome(income);
+      setTotalExpense(expense);
+
+      const categoriesWithTotals = data?.map((c) => ({
+        ...c,
+        total_amount: categoryTotals[c.id] ?? 0,
+      })) ?? [];
+
+      setCategories(categoriesWithTotals);
+    } catch (e: any) {
+      Alert.alert("Lỗi tải dữ liệu", e.message);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    setCategories((data2 as CategoryRow[]) ?? []);
-    setLoading(false);
   };
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [selectedYear, selectedMonth, selectedDay, filterMode]);
 
   const hasTypeCol = useMemo(() => categories.some((c) => c.type != null), [categories]);
 
   const filtered = useMemo(() => {
     const kw = q.trim().toLowerCase();
     let arr = categories;
-
-    if (hasTypeCol) {
-      arr = arr.filter((c) => normalizeType(c.type) === activeType);
-    }
-
-    return arr.filter((c) => {
-      const displayName = (c.name ?? "").toLowerCase();
-      return kw ? displayName.includes(kw) : true;
-    });
+    if (hasTypeCol) arr = arr.filter((c) => normalizeType(c.type) === activeType);
+    return arr.filter((c) => (c.name ?? "").toLowerCase().includes(kw));
   }, [categories, activeType, q, hasTypeCol]);
 
   const iconLibraryFromDb: IconFromDb[] = useMemo(() => {
@@ -131,15 +165,10 @@ export default function CategoriesScreen() {
     for (const c of categories) {
       const pid = c.icon_preset_id?.trim();
       const uri = c.icon_uri?.trim();
-      if (!pid || !uri) continue;
-
+      if (!pid || !uri || uri.startsWith("blob:")) continue;
       const key = `${pid}__${uri}`;
       if (!map.has(key)) {
-        map.set(key, {
-          id: pid,
-          uri,
-          label: (c.name?.trim() || pid).toString(),
-        });
+        map.set(key, { id: pid, uri, label: (c.name?.trim() || pid).toString() });
       }
     }
     return Array.from(map.values());
@@ -151,6 +180,7 @@ export default function CategoriesScreen() {
     setEmoji("");
     setFormType(activeType);
     setIconUri("");
+    setUploadedIconUrl("");
     setIconPresetId("");
     setOpen(true);
   };
@@ -161,6 +191,7 @@ export default function CategoriesScreen() {
     setEmoji(c.emoji ?? "");
     setFormType(normalizeType(c.type));
     setIconUri(c.icon_uri ?? "");
+    setUploadedIconUrl(c.icon_uri ?? "");
     setIconPresetId(c.icon_preset_id ?? "");
     setOpen(true);
   };
@@ -174,33 +205,53 @@ export default function CategoriesScreen() {
 
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      quality: 0.8,
       allowsEditing: true,
       aspect: [1, 1],
     });
 
-    if (!res.canceled) {
-      const uri = res.assets?.[0]?.uri;
-      if (uri) {
-        setIconUri(uri);
-        setIconPresetId("");
-      }
+    if (!res.canceled && res.assets?.[0]?.uri) {
+      setIconUri(res.assets[0].uri);
+      setUploadedIconUrl("");
+      setIconPresetId("");
+    }
+  };
+
+  const uploadImageToStorage = async (localUri: string): Promise<string | null> => {
+    try {
+      const response = await fetch(localUri);
+      const blob = await response.blob();
+      const fileName = `category-${Date.now()}.jpg`;
+      const filePath = `icons/${fileName}`;
+
+      const { error } = await supabase.storage
+        .from("category-icons")
+        .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+
+      if (error) throw error;
+
+      const { data } = supabase.storage.from("category-icons").getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (e: any) {
+      Alert.alert("Lỗi upload", e.message || "Kiểm tra bucket 'category-icons'");
+      return null;
     }
   };
 
   const chooseFromDbLibrary = (it: IconFromDb) => {
     setIconPresetId(it.id);
     setIconUri(it.uri);
+    setUploadedIconUrl(it.uri);
   };
 
   const clearIcon = () => {
     setIconUri("");
+    setUploadedIconUrl("");
     setIconPresetId("");
   };
 
   const onSave = async () => {
     if (saving) return;
-
     const n = name.trim();
     const e = emoji.trim();
 
@@ -210,270 +261,319 @@ export default function CategoriesScreen() {
     }
 
     const uid = await getUserId();
+    let finalIconUri = uploadedIconUrl || iconUri;
+
+    if (iconUri && (iconUri.startsWith("file://") || iconUri.startsWith("blob:"))) {
+      const uploadedUrl = await uploadImageToStorage(iconUri);
+      if (uploadedUrl) {
+        finalIconUri = uploadedUrl;
+      } else {
+        return;
+      }
+    }
 
     const payload: any = {
       name: n,
-      type: editing ? normalizeType(editing.type) : formType,
-      emoji: e ? e : null,
-      icon_uri: iconUri ? iconUri : null,
-      icon_preset_id: iconPresetId ? iconPresetId : null,
+      type: formType,
+      emoji: e || null,
+      icon_uri: finalIconUri || null,
+      icon_preset_id: iconPresetId || null,
     };
     if (uid) payload.user_id = uid;
 
     try {
       setSaving(true);
-
       if (editing) {
-        const { error } = await supabase.from("categories").update(payload).eq("id", String(editing.id));
-        if (error) {
-          Alert.alert("Lỗi sửa danh mục", error.message);
-          return;
-        }
+        const { error } = await supabase.from("categories").update(payload).eq("id", editing.id);
+        if (error) throw error;
       } else {
         const { error } = await supabase.from("categories").insert([payload]);
-        if (error) {
-          Alert.alert("Lỗi thêm danh mục", error.message);
-          return;
-        }
+        if (error) throw error;
       }
 
       setOpen(false);
       await fetchCategories();
+      Alert.alert("Thành công", editing ? "Đã sửa danh mục" : "Đã thêm danh mục mới");
+    } catch (e: any) {
+      Alert.alert("Lỗi lưu", e.message || "Kiểm tra kết nối");
     } finally {
       setSaving(false);
     }
   };
 
-  // ✅ DELETE chắc chắn: ép id về string + select('id') để biết có xóa trúng row không
-  const runDelete = async (row: CategoryRow) => {
-    const idStr = String(row.id);
-
-    const { data, error } = await supabase
-      .from("categories")
-      .delete()
-      .eq("id", idStr)
-      .select("id");
-
-    if (error) {
-      console.log("DELETE ERROR:", error);
-      Alert.alert("Lỗi xóa", error.message);
-      return;
-    }
-
-    if (!data || data.length === 0) {
-      Alert.alert(
-        "Không xóa được",
-        "DB không xóa dòng này. Thường do RLS policy (chưa cho DELETE) hoặc id không match."
-      );
-      return;
-    }
-
-    await fetchCategories();
+  const setFilterToday = () => {
+    setFilterMode("today");
+    setSelectedYear(currentYear);
+    setSelectedMonth(currentMonth);
+    setSelectedDay(currentDay);
   };
 
-  const onDelete = (c: CategoryRow) => {
-    Alert.alert("Xóa danh mục?", `Bạn chắc muốn xóa "${c.name ?? `#${c.id}`}" không?`, [
-      { text: "Hủy", style: "cancel" },
-      { text: "Xóa", style: "destructive", onPress: () => runDelete(c) },
-    ]);
+  const setFilterThisMonth = () => {
+    setFilterMode("month");
+    setSelectedYear(currentYear);
+    setSelectedMonth(currentMonth);
+  };
+
+  const setFilterThisYear = () => {
+    setFilterMode("year");
+    setSelectedYear(currentYear);
   };
 
   return (
     <ThemedView style={styles.screen}>
-      {/* Header */}
-      <ThemedView style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <ThemedText type="title">Danh mục</ThemedText>
-        </View>
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => String(item.id)}
+        numColumns={2}
+        columnWrapperStyle={styles.columnWrap}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            <View style={styles.header}>
+              <View style={{ flex: 1 }}>
+                <ThemedText style={styles.title}>Danh mục</ThemedText>
+                <ThemedText style={styles.subtitle}>Quản lý danh mục thu chi</ThemedText>
+              </View>
 
-        <Pressable onPress={openCreate} style={styles.addBtn} hitSlop={10}>
-          <ThemedText style={styles.addBtnText}>+ Thêm</ThemedText>
-        </Pressable>
-      </ThemedView>
+              <Pressable
+                onPress={openCreate}
+                style={({ pressed }) => [
+                  styles.addButton,
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <ThemedText style={styles.addButtonText}>+</ThemedText>
+              </Pressable>
+            </View>
 
-      {/* Segment */}
-      <ThemedView style={styles.segment}>
-        <Pressable
-          onPress={() => setActiveType("expense")}
-          style={[styles.segmentBtn, activeType === "expense" && styles.segmentBtnActive]}
-          hitSlop={10}
-        >
-          <ThemedText style={styles.segmentText}>Chi</ThemedText>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setActiveType("income")}
-          style={[styles.segmentBtn, activeType === "income" && styles.segmentBtnActive]}
-          hitSlop={10}
-        >
-          <ThemedText style={styles.segmentText}>Thu</ThemedText>
-        </Pressable>
-      </ThemedView>
-
-      {/* Search */}
-      <TextInput value={q} onChangeText={setQ} placeholder="Tìm danh mục..." style={styles.search} />
-
-      {loading ? (
-        <View style={{ paddingVertical: 24 }}>
-          <ActivityIndicator />
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => String(item.id)}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrap}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            // ✅ dùng View thay ThemedView để khỏi chặn touch
-            <View style={styles.card} pointerEvents="auto">
-              <View style={styles.cardTop} pointerEvents="auto">
-                <View style={styles.emojiBox} pointerEvents="none">
-                  {item.icon_uri ? (
-                    <Image source={{ uri: item.icon_uri }} style={{ width: 24, height: 24, borderRadius: 6 }} />
-                  ) : (
-                    <ThemedText style={{ fontSize: 18 }}>{item.emoji ?? "🏷️"}</ThemedText>
-                  )}
+            <View style={styles.statsCard}>
+              <View style={styles.statsRow}>
+                <View style={styles.statBox}>
+                  <ThemedText style={styles.statLabel}>Thu nhập</ThemedText>
+                  <ThemedText style={[styles.statValue, { color: "#10b981" }]}>
+                    {formatVND(totalIncome)}
+                  </ThemedText>
                 </View>
 
-                <View style={{ flex: 1 }}>
-                  <ThemedText style={styles.cardName} numberOfLines={1}>
-                    {item.name ?? `Danh mục #${item.id}`}
-                  </ThemedText>
-                  <ThemedText style={styles.muted} numberOfLines={1}>
-                    {item.type ? (normalizeType(item.type) === "expense" ? "Danh mục chi" : "Danh mục thu") : "—"}
+                <View style={styles.statDivider} />
+
+                <View style={styles.statBox}>
+                  <ThemedText style={styles.statLabel}>Chi tiêu</ThemedText>
+                  <ThemedText style={[styles.statValue, { color: "#ef4444" }]}>
+                    {formatVND(totalExpense)}
                   </ThemedText>
                 </View>
               </View>
-
-              <View style={styles.actions} pointerEvents="auto">
-                <Pressable
-                  onPressIn={() => console.log("PRESS IN EDIT", item.id)}
-                  onPress={() => openEdit(item)}
-                  hitSlop={10}
-                  android_ripple={{ color: "rgba(0,0,0,0.08)" }}
-                  style={({ pressed }) => [styles.editBtn, pressed && styles.pressedBtn]}
-                >
-                  <ThemedText style={styles.btnText}>Sửa</ThemedText>
-                </Pressable>
-
-                <Pressable
-                  onPressIn={() => console.log("PRESS IN DELETE", item.id)}
-                  onPress={() => onDelete(item)}
-                  hitSlop={10}
-                  android_ripple={{ color: "rgba(0,0,0,0.08)" }}
-                  style={({ pressed }) => [styles.delBtn, pressed && styles.pressedBtn]}
-                >
-                  <ThemedText style={styles.btnText}>Xóa</ThemedText>
-                </Pressable>
-              </View>
             </View>
-          )}
-          ListEmptyComponent={
-            <View style={{ paddingVertical: 30, alignItems: "center" }}>
-              <ThemedText style={styles.muted}>Không có dữ liệu trong bảng categories.</ThemedText>
-            </View>
-          }
-        />
-      )}
 
-      {/* Modal Add/Edit */}
-      <Modal visible={open} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <ThemedView style={styles.modalCard}>
-            <ThemedText type="subtitle">{editing ? "Sửa danh mục" : "Thêm danh mục"}</ThemedText>
+            <View style={styles.quickFilters}>
+              <Pressable
+                onPress={setFilterToday}
+                style={[styles.filterChip, filterMode === "today" && styles.filterChipActive]}
+              >
+                <ThemedText
+                  style={[styles.filterChipText, filterMode === "today" && styles.filterChipTextActive]}
+                >
+                  Hôm nay
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={setFilterThisMonth}
+                style={[styles.filterChip, filterMode === "month" && styles.filterChipActive]}
+              >
+                <ThemedText
+                  style={[styles.filterChipText, filterMode === "month" && styles.filterChipTextActive]}
+                >
+                  Tháng này
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={setFilterThisYear}
+                style={[styles.filterChip, filterMode === "year" && styles.filterChipActive]}
+              >
+                <ThemedText
+                  style={[styles.filterChipText, filterMode === "year" && styles.filterChipTextActive]}
+                >
+                  Năm nay
+                </ThemedText>
+              </Pressable>
+            </View>
 
             {hasTypeCol && (
-              <ThemedView style={styles.modalSegment}>
+              <View style={styles.typeToggle}>
+                <Pressable
+                  onPress={() => setActiveType("expense")}
+                  style={[
+                    styles.toggleBtn,
+                    activeType === "expense" && styles.toggleBtnActiveExpense,
+                  ]}
+                >
+                  <ThemedText style={styles.toggleText}>Chi tiêu</ThemedText>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setActiveType("income")}
+                  style={[
+                    styles.toggleBtn,
+                    activeType === "income" && styles.toggleBtnActiveIncome,
+                  ]}
+                >
+                  <ThemedText style={styles.toggleText}>Thu nhập</ThemedText>
+                </Pressable>
+              </View>
+            )}
+
+            <View style={styles.searchContainer}>
+              <ThemedText style={styles.searchIcon}>🔍</ThemedText>
+              <TextInput
+                value={q}
+                onChangeText={setQ}
+                placeholder="Tìm danh mục..."
+                placeholderTextColor="#9ca3af"
+                style={styles.searchInput}
+              />
+            </View>
+
+            <ThemedText style={styles.sectionTitle}>
+              {filtered.length} danh mục
+            </ThemedText>
+          </>
+        }
+        renderItem={({ item }) => <CategoryCard item={item} onEdit={openEdit} />}
+        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.emptyContainer}>
+              <ActivityIndicator size="large" color="#666" />
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <ThemedText style={styles.emptyIcon}>📂</ThemedText>
+              <ThemedText style={styles.emptyTitle}>Chưa có danh mục</ThemedText>
+              <ThemedText style={styles.emptyDesc}>Nhấn nút + để tạo danh mục đầu tiên</ThemedText>
+            </View>
+          )
+        }
+      />
+
+      <Modal visible={open} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <ThemedView style={styles.modalContent}>
+            <ThemedText style={styles.modalTitle}>
+              {editing ? "Sửa danh mục" : "Thêm danh mục"}
+            </ThemedText>
+
+            {hasTypeCol && (
+              <View style={styles.modalTypeToggle}>
                 <Pressable
                   disabled={!!editing}
                   onPress={() => setFormType("expense")}
                   style={[
-                    styles.modalSegBtn,
-                    formType === "expense" && styles.modalSegBtnActive,
-                    editing && styles.modalSegDisabled,
+                    styles.modalTypeBtn,
+                    formType === "expense" && styles.modalTypeBtnActiveExpense,
+                    editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={styles.segmentText}>Chi tiêu</ThemedText>
+                  <ThemedText style={styles.modalTypeText}>Chi tiêu</ThemedText>
                 </Pressable>
 
                 <Pressable
                   disabled={!!editing}
                   onPress={() => setFormType("income")}
                   style={[
-                    styles.modalSegBtn,
-                    formType === "income" && styles.modalSegBtnActive,
-                    editing && styles.modalSegDisabled,
+                    styles.modalTypeBtn,
+                    formType === "income" && styles.modalTypeBtnActiveIncome,
+                    editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={styles.segmentText}>Thu nhập</ThemedText>
+                  <ThemedText style={styles.modalTypeText}>Thu nhập</ThemedText>
                 </Pressable>
-              </ThemedView>
+              </View>
             )}
 
-            <TextInput value={name} onChangeText={setName} placeholder="Tên danh mục" style={styles.modalInput} />
-            <TextInput value={emoji} onChangeText={setEmoji} placeholder="Emoji (có thể bỏ trống)" style={styles.modalInput} />
+            <View style={styles.inputContainer}>
+              <TextInput
+                value={name}
+                onChangeText={setName}
+                placeholder="Tên danh mục"
+                placeholderTextColor="#9ca3af"
+                style={styles.modalInput}
+              />
+            </View>
 
-            <ThemedView style={{ marginTop: 12 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <ThemedText style={styles.muted}>Icon (DB / ảnh thư viện)</ThemedText>
+            <View style={styles.inputContainer}>
+              <TextInput
+                value={emoji}
+                onChangeText={setEmoji}
+                placeholder="Emoji (tùy chọn)"
+                placeholderTextColor="#9ca3af"
+                style={styles.modalInput}
+              />
+            </View>
 
+            <View style={styles.iconSection}>
+              <View style={styles.iconHeader}>
+                <ThemedText style={styles.iconLabel}>Icon</ThemedText>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <Pressable onPress={pickFromLibrary} style={styles.btnMini} hitSlop={10}>
-                    <ThemedText style={styles.btnMiniText}>Thư viện</ThemedText>
+                  <Pressable onPress={pickFromLibrary} style={styles.iconBtn}>
+                    <ThemedText style={styles.iconBtnText}>Chọn ảnh</ThemedText>
                   </Pressable>
-
-                  <Pressable onPress={clearIcon} style={styles.btnMiniGhost} hitSlop={10}>
-                    <ThemedText style={styles.btnMiniText}>Xóa</ThemedText>
+                  <Pressable onPress={clearIcon} style={styles.iconBtnGhost}>
+                    <ThemedText style={styles.iconBtnText}>Xóa</ThemedText>
                   </Pressable>
                 </View>
               </View>
 
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
-                <ThemedView style={styles.iconPreview}>
-                  {iconUri ? (
-                    <Image source={{ uri: iconUri }} style={{ width: 40, height: 40, borderRadius: 12 }} />
-                  ) : (
-                    <ThemedText style={styles.muted}>Chưa chọn</ThemedText>
-                  )}
-                </ThemedView>
-
-                <ThemedText style={styles.muted} numberOfLines={2}>
-                  Preset bên dưới tự lấy từ DB (icon_preset_id + icon_uri).
-                </ThemedText>
-              </View>
+              {iconUri && (
+                <View style={styles.iconPreview}>
+                  <Image source={{ uri: iconUri }} style={styles.iconPreviewImage} />
+                </View>
+              )}
 
               {iconLibraryFromDb.length > 0 && (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingTop: 10 }}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.iconLibrary}
+                >
                   {iconLibraryFromDb.map((it) => {
                     const active = iconPresetId === it.id && iconUri === it.uri;
                     return (
                       <Pressable
                         key={`${it.id}__${it.uri}`}
                         onPress={() => chooseFromDbLibrary(it)}
-                        style={[styles.presetItem, active && styles.presetItemActive]}
-                        hitSlop={10}
+                        style={[styles.iconLibraryItem, active && styles.iconLibraryItemActive]}
                       >
-                        <Image source={{ uri: it.uri }} style={{ width: 32, height: 32 }} />
-                        <ThemedText style={{ fontSize: 11, opacity: 0.7 }} numberOfLines={1}>
-                          {it.label}
-                        </ThemedText>
+                        <Image source={{ uri: it.uri }} style={styles.iconLibraryImage} />
                       </Pressable>
                     );
                   })}
                 </ScrollView>
               )}
-            </ThemedView>
+            </View>
 
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-              <Pressable onPress={() => setOpen(false)} style={styles.btnGhost} disabled={saving} hitSlop={10}>
-                <ThemedText style={styles.btnText}>Hủy</ThemedText>
+            <View style={styles.modalButtons}>
+              <Pressable
+                onPress={() => setOpen(false)}
+                style={styles.modalBtnCancel}
+                disabled={saving}
+              >
+                <ThemedText style={styles.modalBtnCancelText}>Hủy</ThemedText>
               </Pressable>
 
-              <Pressable onPress={onSave} style={styles.btnSolid} disabled={saving} hitSlop={10}>
-                {saving ? <ActivityIndicator /> : <ThemedText style={[styles.btnText, { color: "#fff" }]}>Lưu</ThemedText>}
+              <Pressable
+                onPress={onSave}
+                style={[styles.modalBtnSave, saving && { opacity: 0.7 }]}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.modalBtnSaveText}>Lưu</ThemedText>
+                )}
               </Pressable>
             </View>
           </ThemedView>
@@ -483,108 +583,462 @@ export default function CategoriesScreen() {
   );
 }
 
+function CategoryCard({ item, onEdit }: { item: CategoryRow; onEdit: (c: CategoryRow) => void }) {
+  const isIncome = normalizeType(item.type) === "income";
+
+  // Đảm bảo amount luôn là số hợp lệ, tránh NaN/undefined/null
+  const amount = Number(item.total_amount ?? 0);
+
+  // Xác định màu dựa trên giá trị amount
+  const amountColor =
+    amount > 0
+      ? "#10b981"   // xanh lá - thu nhập hoặc danh mục có tổng dương
+      : amount < 0
+        ? "#ef4444" // đỏ - chi tiêu hoặc danh mục có tổng âm
+        : "#9ca3af"; // xám - bằng 0 hoặc chưa có giao dịch
+
+  return (
+    <Pressable
+      onPress={() => onEdit(item)}
+      style={({ pressed }) => [
+        styles.categoryCard,
+        pressed && { opacity: 0.85 },
+      ]}
+    >
+      <View style={styles.categoryContent}>
+        {/* Icon hoặc Emoji */}
+        <View style={styles.categoryIconContainer}>
+          {item.icon_uri && !item.icon_uri.startsWith("blob:") ? (
+            <Image source={{ uri: item.icon_uri }} style={styles.categoryIcon} />
+          ) : item.emoji ? (
+            <ThemedText style={styles.categoryEmoji}>{item.emoji}</ThemedText>
+          ) : (
+            <ThemedText style={styles.categoryEmoji}>🏷️</ThemedText>
+          )}
+        </View>
+
+        {/* Tên danh mục */}
+        <ThemedText style={styles.categoryName} numberOfLines={1}>
+          {item.name ?? `#${item.id}`}
+        </ThemedText>
+
+        {/* Badge Thu / Chi */}
+        <View
+          style={[
+            styles.categoryBadge,
+            {
+              backgroundColor: isIncome
+                ? "rgba(16, 185, 129, 0.12)" 
+                : "rgba(239, 68, 68, 0.12)",
+            },
+          ]}
+        >
+          <ThemedText style={styles.categoryBadgeText}>
+            {isIncome ? "Thu" : "Chi"}
+          </ThemedText>
+        </View>
+
+        {/* Số tiền + màu + dấu + */}
+        <ThemedText style={[styles.categoryAmount, { color: amountColor }]}>
+          {amount > 0 ? "+" : amount < 0 ? "-" : ""}
+          {formatVND(Math.abs(amount))}
+        </ThemedText>
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
-
-  header: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 },
-  muted: { opacity: 0.7, marginTop: 2 },
-
-  addBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.35)",
+  screen: {
+    flex: 1,
   },
-  addBtnText: { fontSize: 14, fontWeight: "700" },
 
-  segment: {
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 100,
+  },
+
+  header: {
     flexDirection: "row",
-    borderRadius: 16,
-    padding: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
-    marginBottom: 10,
+    alignItems: "center",
+    marginBottom: 24,
   },
-  segmentBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
-  segmentBtnActive: { borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  segmentText: { fontWeight: "800" },
+  title: {
+    fontSize: 32,
+    fontWeight: "700",
+  },
+  subtitle: {
+    fontSize: 14,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#3b82f6",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  addButtonText: {
+    fontSize: 32,
+    color: "white",
+    fontWeight: "bold",
+  },
 
-  search: {
+  statsCard: {
+    backgroundColor: "rgba(0,0,0,0.04)",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.1)",
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  statBox: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statLabel: {
+    fontSize: 12,
+    opacity: 0.7,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: "rgba(0,0,0,0.12)",
+    marginHorizontal: 16,
+  },
+
+  quickFilters: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+  },
+  filterChip: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center",
+  },
+  filterChipActive: {
+    backgroundColor: "#3b82f6",
+    borderColor: "#3b82f6",
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    opacity: 0.8,
+  },
+  filterChipTextActive: {
+    color: "white",
+    opacity: 1,
+  },
+
+  typeToggle: {
+    flexDirection: "row",
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.12)",
+    marginBottom: 20,
+    backgroundColor: "rgba(0,0,0,0.04)",
+  },
+  toggleBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  toggleBtnActiveExpense: {
+    backgroundColor: "rgba(239,68,68,0.15)",
+  },
+  toggleBtnActiveIncome: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+  },
+  toggleText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 14,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderColor: "rgba(0,0,0,0.12)",
+    marginBottom: 16,
+  },
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 8,
+    opacity: 0.6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#000",
+  },
+
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    opacity: 0.7,
     marginBottom: 12,
   },
 
-  columnWrap: { gap: 10, justifyContent: "space-between" },
+  columnWrap: {
+    gap: 12,
+  },
 
-  // ✅ View card
-  card: {
+  categoryCard: {
     flex: 1,
     borderRadius: 16,
-    padding: 12,
+    backgroundColor: "rgba(0,0,0,0.04)",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderColor: "rgba(0,0,0,0.1)",
+    overflow: "hidden",
   },
-  cardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
-
-  emojiBox: {
-    width: 40,
-    height: 40,
+  categoryContent: {
+    padding: 16,
+  },
+  categoryIconContainer: {
+    width: 56,
+    height: 56,
     borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    marginBottom: 12,
   },
-
-  cardName: { fontSize: 14, fontWeight: "800", marginBottom: 2 },
-
-  actions: { flexDirection: "row", gap: 10, marginTop: 12 },
-
-  editBtn: {
-    flex: 1,
-    paddingVertical: 8,
+  categoryIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+  },
+  categoryEmoji: {
+    fontSize: 32,
+  },
+  categoryName: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  categoryBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 12,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
-    overflow: "hidden",
+    marginBottom: 8,
   },
-  delBtn: {
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  categoryAmount: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+
+  emptyContainer: {
+    paddingVertical: 80,
+    alignItems: "center",
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    opacity: 0.6,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  emptyDesc: {
+    fontSize: 14,
+    opacity: 0.7,
+    textAlign: "center",
+  },
+
+  // ── Modal ───────────────────────────────────────────────
+  modalOverlay: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 12,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
-    overflow: "hidden",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
   },
-  pressedBtn: { opacity: 0.6, transform: [{ scale: 0.98 }] },
+  modalContent: {
+    borderRadius: 20,
+    padding: 24,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    marginBottom: 24,
+  },
 
-  btnText: { fontWeight: "800", fontSize: 13 },
+  modalTypeToggle: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 20,
+  },
+  modalTypeBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center",
+  },
+  modalTypeBtnActiveExpense: {
+    backgroundColor: "rgba(239,68,68,0.15)",
+    borderColor: "rgba(239,68,68,0.4)",
+  },
+  modalTypeBtnActiveIncome: {
+    backgroundColor: "rgba(16,185,129,0.15)",
+    borderColor: "rgba(16,185,129,0.4)",
+  },
+  modalTypeText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
 
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.25)", justifyContent: "center", padding: 18 },
-  modalCard: { borderRadius: 18, padding: 16, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  modalInput: {
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.12)",
+    fontSize: 16,
+  },
 
-  modalInput: { marginTop: 10, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
+  iconSection: {
+    marginBottom: 24,
+  },
+  iconHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  iconLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    opacity: 0.8,
+  },
+  iconBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: "rgba(59,130,246,0.15)",
+  },
+  iconBtnGhost: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.2)",
+  },
+  iconBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  iconPreview: {
+    alignSelf: "flex-start",
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,0,0,0.12)",
+    marginBottom: 12,
+  },
+  iconPreviewImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 10,
+  },
+  iconLibrary: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  iconLibraryItem: {
+    width: 70,
+    height: 70,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.06)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconLibraryItemActive: {
+    borderColor: "#3b82f6",
+    borderWidth: 2,
+  },
+  iconLibraryImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+  },
 
-  modalSegment: { flexDirection: "row", borderRadius: 14, padding: 4, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)", marginTop: 10 },
-  modalSegBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
-  modalSegBtnActive: { borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  modalSegDisabled: { opacity: 0.75 },
-
-  iconPreview: { width: 56, height: 56, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  presetItem: { width: 74, height: 74, borderRadius: 16, padding: 8, alignItems: "center", justifyContent: "center", gap: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  presetItemActive: { borderWidth: 2, borderColor: "#111" },
-
-  btnMini: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: "#111" },
-  btnMiniGhost: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  btnMiniText: { fontWeight: "800", fontSize: 12, color: "#fff" },
-
-  btnGhost: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, borderColor: "rgba(127,127,127,0.25)" },
-  btnSolid: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: "center", backgroundColor: "#111" },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.15)",
+    alignItems: "center",
+  },
+  modalBtnCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    opacity: 0.9,
+  },
+  modalBtnSave: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#3b82f6",
+    alignItems: "center",
+  },
+  modalBtnSaveText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+  },
 });
