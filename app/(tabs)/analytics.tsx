@@ -1,318 +1,569 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
-import { VictoryAxis, VictoryBar, VictoryChart, VictoryPie } from "victory-native";
+// src/screens/AnalyticsScreen.tsx
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
 
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { Picker } from '@react-native-picker/picker';
 
-type Tx = {
-  id: string;
-  type: "income" | "expense";
-  category: string;
-  note: string;
-  amount: number;
-  day: number;
-};
+import { supabase } from '@/lib/supabase';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 
-const DATA: Record<string, Tx[]> = {
-  "01/2026": [
-    { id: "t1", type: "income", category: "Lương", note: "Lương tháng", amount: 12000000, day: 5 },
-    { id: "t2", type: "expense", category: "Ăn uống", note: "Ăn trưa", amount: 65000, day: 6 },
-    { id: "t3", type: "expense", category: "Di chuyển", note: "Đổ xăng", amount: 120000, day: 7 },
-    { id: "t4", type: "expense", category: "Mua sắm", note: "Áo", amount: 350000, day: 8 },
-    { id: "t5", type: "expense", category: "Giải trí", note: "Xem phim", amount: 90000, day: 9 },
-    { id: "t6", type: "income", category: "Thưởng", note: "Bonus", amount: 500000, day: 12 },
-    { id: "t7", type: "expense", category: "Hóa đơn", note: "Điện nước", amount: 420000, day: 15 },
-    { id: "t8", type: "expense", category: "Ăn uống", note: "Cafe", amount: 45000, day: 16 },
-    { id: "t9", type: "expense", category: "Ăn uống", note: "Ăn tối", amount: 110000, day: 18 },
-  ],
-  "12/2025": [
-    { id: "a1", type: "income", category: "Lương", note: "Lương tháng", amount: 11500000, day: 5 },
-    { id: "a2", type: "expense", category: "Ăn uống", note: "Bún", amount: 50000, day: 6 },
-    { id: "a3", type: "expense", category: "Mua sắm", note: "Giày", amount: 900000, day: 10 },
-    { id: "a4", type: "expense", category: "Hóa đơn", note: "Internet", amount: 240000, day: 12 },
-    { id: "a5", type: "income", category: "Khác", note: "Freelance", amount: 1500000, day: 20 },
-  ],
-};
-
-const MONTHS = ["01/2026", "12/2025"];
-
-const PIE_COLORS = ["#4F46E5", "#22C55E", "#F97316", "#EF4444", "#06B6D4", "#A855F7", "#F59E0B", "#10B981"];
-
-const fmtMoney = (v: number) => new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 }).format(v) + " ₫";
-
-function sumBy(txs: Tx[], type: Tx["type"]) {
-  return txs.filter((t) => t.type === type).reduce((s, t) => s + t.amount, 0);
+// Victory setup
+let V: any;
+if (Platform.OS === 'web') {
+  V = require('victory');
+} else {
+  const m = require('victory-native');
+  V = { ...m, ...(m?.default ?? {}) };
 }
 
+const { VictoryPie, VictoryAxis, VictoryChart, VictoryBar, VictoryGroup } = V;
+
+// ──────────────────────────────────────────────
+// TYPES
+type Category = {
+  id: number;
+  name: string;
+  type: 'income' | 'expense';
+  emoji: string | null;
+  icon_uri: string | null;
+  icon_preset_id: string | null;
+  created_at: string;
+};
+
+type Transaction = {
+  id: number;
+  type: 'income' | 'expense';
+  amount: number;
+  note: string | null;
+  occurred_at: string;
+  category_id: number;
+  category?: Partial<Category>;
+};
+
+type MonthlySummary = {
+  month: string; // "YYYY-MM"
+  income: number;
+  expense: number;
+};
+
+interface PieDatum {
+  x: string;
+  y: number;
+  percent: number;
+  fill: string;
+}
+
+// ──────────────────────────────────────────────
+const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
+const YEARS = ['2024', '2025', '2026', '2027'];
+
+const PIE_COLORS = [
+  '#4F46E5', '#22C55E', '#F97316', '#EF4444', '#06B6D4',
+  '#A855F7', '#F59E0B', '#10B981', '#6366F1', '#EC4899',
+];
+
+const fmtMoney = (value: number) =>
+  new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 }).format(value) + ' ₫';
+
+// ──────────────────────────────────────────────
 export default function AnalyticsScreen() {
-  console.log("VictoryPie:", VictoryPie);
-console.log("VictoryChart:", VictoryChart);
-
   const scheme = useColorScheme();
-  const theme = Colors[scheme ?? "light"];
+  const theme = Colors[scheme ?? 'light'];
 
-  const bg = theme.background ?? "#fff";
+  const bg = theme.background ?? '#fff';
   const card = (theme as any).card ?? bg;
-  const text = theme.text ?? "#111";
-  const tint = theme.tint ?? "#2f6fed";
+  const text = theme.text ?? '#111';
+  const tint = theme.tint ?? '#2f6fed';
 
-  const [month, setMonth] = useState(MONTHS[0]);
-  const [mode, setMode] = useState<"expense" | "income">("expense");
+  // Mặc định tháng/năm hiện tại
+  const now = new Date();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+  const currentYear = now.getFullYear().toString();
 
-  const txs = DATA[month] ?? [];
+  const [selectedMonth, setSelectedMonth] = useState(currentMonth);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  const income = useMemo(() => sumBy(txs, "income"), [txs]);
-  const expense = useMemo(() => sumBy(txs, "expense"), [txs]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [categoriesMap, setCategoriesMap] = useState<Record<number, Category>>({});
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+
+  const currentYearMonth = `${selectedYear}-${selectedMonth}`;
+
+  // ──────────────────────────────────────────────
+  // Fetch dữ liệu
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Chưa đăng nhập');
+
+        const userId = user.id;
+
+        // Categories
+        const { data: cats, error: catErr } = await supabase
+          .from('categories')
+          .select('*')
+          .eq('user_id', userId)
+          .order('name');
+
+        if (catErr) throw catErr;
+
+        const catMap: Record<number, Category> = {};
+        cats?.forEach(c => { catMap[c.id] = c; });
+        setCategoriesMap(catMap);
+
+        // Transactions
+        const { data: txs, error: txErr } = await supabase
+          .from('transactions')
+          .select(`
+            id, type, amount, occurred_at, category_id, note,
+            category:categories (id, name, type, emoji, icon_uri, icon_preset_id)
+          `)
+          .eq('user_id', userId)
+          .order('occurred_at', { ascending: false })
+          .limit(2000);
+
+        if (txErr) throw txErr;
+
+        setAllTransactions((txs as Transaction[]) || []);
+      } catch (err: any) {
+        setError(err.message || 'Lỗi tải dữ liệu');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // ──────────────────────────────────────────────
+  const currentTransactions = useMemo(() => {
+    return allTransactions.filter(t => {
+      const date = new Date(t.occurred_at);
+      const y = date.getFullYear().toString();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      return `${y}-${m}` === currentYearMonth;
+    });
+  }, [allTransactions, currentYearMonth]);
+
+  const income = useMemo(() =>
+    currentTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0),
+  [currentTransactions]);
+
+  const expense = useMemo(() =>
+    currentTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0),
+  [currentTransactions]);
+
   const balance = income - expense;
-  const total = income + expense;
 
-  const pieIncomeExpense = useMemo(() => {
-    const a = Math.max(income, 0);
-    const b = Math.max(expense, 0);
-    if (a === 0 && b === 0) return [{ x: "NoData", y: 1 }];
-    return [
-      { x: "Thu", y: a },
-      { x: "Chi", y: b },
-    ];
-  }, [income, expense]);
+  // ──────────────────────────────────────────────
+  const monthlyComparison = useMemo(() => {
+    const map = new Map<string, MonthlySummary>();
 
+    allTransactions.forEach(t => {
+      const date = new Date(t.occurred_at);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!map.has(monthKey)) {
+        map.set(monthKey, { month: monthKey, income: 0, expense: 0 });
+      }
+
+      const entry = map.get(monthKey)!;
+      if (t.type === 'income') entry.income += Number(t.amount);
+      else if (t.type === 'expense') entry.expense += Number(t.amount);
+    });
+
+    return Array.from(map.values())
+      .sort((a, b) => b.month.localeCompare(a.month))
+      .slice(0, 12);
+  }, [allTransactions]);
+
+  // ──────────────────────────────────────────────
   const expensePieData = useMemo(() => {
-    const m = new Map<string, number>();
-    txs.filter((t) => t.type === "expense").forEach((t) => m.set(t.category, (m.get(t.category) ?? 0) + t.amount));
+    const map = new Map<string, number>();
 
-    const entries = [...m.entries()].sort((a, b) => b[1] - a[1]);
-    const totalExpense = entries.reduce((s, [, v]) => s + v, 0);
-    if (entries.length === 0) return [];
+    currentTransactions
+      .filter(t => t.type === 'expense')
+      .forEach(t => {
+        const catName = categoriesMap[t.category_id]?.name || 'Khác';
+        map.set(catName, (map.get(catName) || 0) + Number(t.amount));
+      });
 
-    return entries.map(([category, amount], idx) => ({
-      x: category,
-      y: amount,
-      percent: totalExpense > 0 ? Math.round((amount / totalExpense) * 100) : 0,
-      fill: PIE_COLORS[idx % PIE_COLORS.length],
-    }));
-  }, [txs]);
+    const total = Array.from(map.values()).reduce((s, v) => s + v, 0);
 
-  const topCategories = useMemo(() => {
-    const m = new Map<string, number>();
-    txs.filter((t) => t.type === mode).forEach((t) => m.set(t.category, (m.get(t.category) ?? 0) + t.amount));
-    return [...m.entries()]
-      .map(([category, total]) => ({ category, total }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 6);
-  }, [txs, mode]);
+    return Array.from(map.entries())
+      .map(([name, amount], idx) => ({
+        x: name,
+        y: amount,
+        percent: total > 0 ? Math.round((amount / total) * 100) : 0,
+        fill: PIE_COLORS[idx % PIE_COLORS.length],
+      }))
+      .sort((a, b) => b.y - a.y);
+  }, [currentTransactions, categoriesMap]);
 
-  const recent = useMemo(() => [...txs].sort((a, b) => b.day - a.day).slice(0, 6), [txs]);
+  // ──────────────────────────────────────────────
+  const filteredTransactions = useMemo(() => {
+    return currentTransactions
+      .filter(t => {
+        if (filterType !== 'all' && t.type !== filterType) return false;
+        if (selectedCategoryId !== null && t.category_id !== selectedCategoryId) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime());
+  }, [currentTransactions, filterType, selectedCategoryId]);
+
+  // ──────────────────────────────────────────────
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: bg }}>
+        <ActivityIndicator size="large" color={tint} />
+        <Text style={{ marginTop: 16, color: text }}>Đang tải dữ liệu...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: bg }}>
+        <Text style={{ color: '#ef4444', fontSize: 18, textAlign: 'center' }}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!VictoryPie || !VictoryAxis || !VictoryChart || !VictoryBar) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: bg }}>
+        <Text style={{ color: text, fontWeight: '900' }}>Không tải được biểu đồ</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, gap: 12 }}>
-      <View style={{ gap: 6 }}>
-        <Text style={{ fontSize: 24, fontWeight: "900", color: text }}>Thống kê</Text>
-      </View>
+    <ScrollView style={{ flex: 1, backgroundColor: bg }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+      <Text style={{ fontSize: 28, fontWeight: '900', color: text, marginBottom: 16 }}>
+        Thống kê
+      </Text>
 
-      <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-        {MONTHS.map((m) => {
-          const active = m === month;
-          return (
-            <Pressable
-              key={m}
-              onPress={() => setMonth(m)}
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 12,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: active ? tint : text + "22",
-                backgroundColor: active ? tint : "transparent",
-              }}
-            >
-              <Text style={{ fontWeight: "800", color: active ? "white" : text }}>{m}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={{ flexDirection: "row", gap: 10 }}>
-        <View style={{ flex: 1, padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-          <Text style={{ color: text + "AA", fontWeight: "700" }}>Thu</Text>
-          <Text style={{ fontSize: 18, fontWeight: "900", color: text, marginTop: 6 }}>{fmtMoney(income)}</Text>
+      {/* Chọn tháng & năm */}
+      <View style={{ backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: text + '22' }}>
+        <Text style={{ fontSize: 16, fontWeight: '700', color: text, marginBottom: 12 }}>
+          Chọn thời gian
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: text + 'AA', marginBottom: 6 }}>Tháng</Text>
+            <View style={{ borderWidth: 1, borderColor: tint, borderRadius: 12, overflow: 'hidden' }}>
+              <Picker
+                selectedValue={selectedMonth}
+                onValueChange={setSelectedMonth}
+                style={{ color: text, height: 48 }}
+                dropdownIconColor={tint}
+              >
+                {MONTHS.map(m => <Picker.Item key={m} label={m} value={m} />)}
+              </Picker>
+            </View>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: text + 'AA', marginBottom: 6 }}>Năm</Text>
+            <View style={{ borderWidth: 1, borderColor: tint, borderRadius: 12, overflow: 'hidden' }}>
+              <Picker
+                selectedValue={selectedYear}
+                onValueChange={setSelectedYear}
+                style={{ color: text, height: 48 }}
+                dropdownIconColor={tint}
+              >
+                {YEARS.map(y => <Picker.Item key={y} label={y} value={y} />)}
+              </Picker>
+            </View>
+          </View>
         </View>
+        <Text style={{ marginTop: 12, textAlign: 'center', color: tint, fontWeight: '700' }}>
+          {currentYearMonth}
+        </Text>
+      </View>
 
-        <View style={{ flex: 1, padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-          <Text style={{ color: text + "AA", fontWeight: "700" }}>Chi</Text>
-          <Text style={{ fontSize: 18, fontWeight: "900", color: text, marginTop: 6 }}>{fmtMoney(expense)}</Text>
+      {/* Cards */}
+      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+          <Text style={{ color: text + 'AA' }}>Thu nhập</Text>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: tint }}>{fmtMoney(income)}</Text>
+        </View>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+          <Text style={{ color: text + 'AA' }}>Chi tiêu</Text>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: '#ef4444' }}>{fmtMoney(expense)}</Text>
         </View>
       </View>
 
-      <View style={{ padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-        <Text style={{ color: text + "AA", fontWeight: "700" }}>Số dư</Text>
-        <Text style={{ fontSize: 22, fontWeight: "900", color: balance >= 0 ? tint : text, marginTop: 6 }}>
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+        <Text style={{ color: text + 'AA' }}>Số dư</Text>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: balance >= 0 ? tint : '#ef4444' }}>
           {fmtMoney(balance)}
         </Text>
       </View>
 
-      {/* Donut Thu/Chi */}
-      <View style={{ padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-        <Text style={{ fontSize: 16, fontWeight: "900", color: text, marginBottom: 8 }}>Thu vs Chi</Text>
-        <View style={{ alignItems: "center" }}>
-          <VictoryPie
-            data={pieIncomeExpense as any}
-            innerRadius={70}
-            padAngle={2}
-            labels={() => ""}
-            width={320}
-            height={240}
-            style={{
-              data: {
-                fill: ({ datum }: any) => {
-                  if (datum.x === "Thu") return tint;
-                  if (datum.x === "Chi") return text + "44";
-                  return text + "22";
-                },
-              },
-            }}
-          />
-          <View style={{ position: "absolute", top: 110, alignItems: "center" }}>
-            <Text style={{ color: text + "AA", fontWeight: "800" }}>Tổng</Text>
-            <Text style={{ color: text, fontSize: 18, fontWeight: "900" }}>{fmtMoney(total)}</Text>
-          </View>
-        </View>
-      </View>
+      {/* So sánh thu/chi các tháng */}
+      {monthlyComparison.length > 0 && (
+        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
+            So sánh thu/chi giữa các tháng
+          </Text>
 
-      {/* Pie theo danh mục chi */}
-      <View style={{ padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-        <Text style={{ fontSize: 16, fontWeight: "900", color: text, marginBottom: 8 }}>Phân bổ chi theo danh mục</Text>
-
-        {expensePieData.length === 0 ? (
-          <Text style={{ color: text + "AA" }}>Chưa có dữ liệu chi.</Text>
-        ) : (
-          <View style={{ alignItems: "center" }}>
-            <VictoryPie
-              data={expensePieData as any}
-              innerRadius={60}
-              padAngle={2}
-              width={320}
-              height={260}
-              labels={({ datum }: any) => `${datum.percent}%`}
-              labelRadius={92}
-              style={{
-                data: { fill: ({ datum }: any) => datum.fill },
-                labels: { fill: text, fontSize: 12, fontWeight: "700" },
-              }}
-            />
-          </View>
-        )}
-
-        <View style={{ marginTop: 10, gap: 8 }}>
-          {expensePieData.map((d) => (
-            <View key={d.x} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 6 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: d.fill }} />
-                <Text style={{ color: text, fontWeight: "800" }}>
-                  {d.x} • {d.percent}%
-                </Text>
-              </View>
-              <Text style={{ color: text, fontWeight: "900" }}>{fmtMoney(d.y)}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Bar */}
-      <View style={{ padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text style={{ fontSize: 16, fontWeight: "900", color: text }}>Top danh mục</Text>
-
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Pressable
-              onPress={() => setMode("expense")}
-              style={{
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: mode === "expense" ? tint : text + "22",
-                backgroundColor: mode === "expense" ? tint : "transparent",
-              }}
-            >
-              <Text style={{ fontWeight: "900", color: mode === "expense" ? "white" : text }}>Chi</Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setMode("income")}
-              style={{
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: mode === "income" ? tint : text + "22",
-                backgroundColor: mode === "income" ? tint : "transparent",
-              }}
-            >
-              <Text style={{ fontWeight: "900", color: mode === "income" ? "white" : text }}>Thu</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {topCategories.length === 0 ? (
-          <Text style={{ marginTop: 12, color: text + "AA" }}>Chưa có dữ liệu.</Text>
-        ) : (
-          <VictoryChart height={260} padding={{ top: 20, bottom: 50, left: 60, right: 20 }} domainPadding={{ x: 18 }}>
+          <VictoryChart
+            height={340}
+            padding={{ top: 30, bottom: 110, left: 80, right: 30 }}
+            domainPadding={{ x: 30 }}
+          >
             <VictoryAxis
-              tickFormat={(t: any) => String(t).slice(0, 6)}
+              tickFormat={(t: string) => t}
               style={{
-                tickLabels: { fill: text + "AA", fontSize: 10 },
-                axis: { stroke: text + "22" },
-                ticks: { stroke: text + "22" },
+                tickLabels: { fill: text + 'AA', fontSize: 10, angle: -45 },
+                axis: { stroke: text + '44' },
               }}
             />
             <VictoryAxis
               dependentAxis
-              tickFormat={(t: any) => `${Math.round(((+t || 0) / 1000))}k`}
+              tickFormat={(t: number) => `${Math.round(t / 1000000)}M`}
               style={{
-                tickLabels: { fill: text + "AA", fontSize: 10 },
-                grid: { stroke: text + "12" },
-                axis: { stroke: text + "22" },
-                ticks: { stroke: text + "22" },
+                tickLabels: { fill: text + 'AA', fontSize: 10 },
+                grid: { stroke: text + '22' },
+                axis: { stroke: text + '44' },
               }}
             />
-            <VictoryBar data={topCategories.map((x) => ({ x: x.category, y: x.total }))} cornerRadius={{ top: 8, bottom: 8 }} style={{ data: { fill: tint } }} />
+            <VictoryGroup offset={24}>
+              <VictoryBar
+                data={monthlyComparison.map(m => ({ x: m.month, y: m.income }))}
+                cornerRadius={{ top: 6 }}
+                style={{ data: { fill: tint } }}
+                barWidth={20}
+              />
+              <VictoryBar
+                data={monthlyComparison.map(m => ({ x: m.month, y: m.expense }))}
+                cornerRadius={{ top: 6 }}
+                style={{ data: { fill: '#ef4444' } }}
+                barWidth={20}
+              />
+            </VictoryGroup>
           </VictoryChart>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: tint }} />
+              <Text style={{ color: text + 'CC' }}>Thu nhập</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: '#ef4444' }} />
+              <Text style={{ color: text + 'CC' }}>Chi tiêu</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Pie chi tiêu */}
+      {expense > 0 && expensePieData.length > 0 && (
+        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+          <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
+            Phân bổ chi tiêu theo danh mục
+          </Text>
+
+          <View style={{ alignItems: 'center' }}>
+            <VictoryPie
+              data={expensePieData}
+              innerRadius={70}
+              padAngle={3}
+              width={340}
+              height={280}
+              labels={(({ datum }: { datum: PieDatum }) => datum.percent > 5 ? `${datum.percent}%` : '')}
+              labelRadius={95}
+              style={{
+                data: { fill: ({ datum }: { datum: PieDatum }) => datum.fill },
+                labels: { fill: text, fontSize: 13, fontWeight: 'bold' },
+              }}
+            />
+          </View>
+
+          <View style={{ marginTop: 16, gap: 10 }}>
+            {expensePieData.map((item, idx) => (
+              <View
+                key={idx}
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: `${text}11`,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: item.fill }} />
+                  <Text style={{ color: text, fontWeight: '600' }}>{item.x}</Text>
+                </View>
+                <Text style={{ color: text, fontWeight: '700' }}>{fmtMoney(item.y)}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Bộ lọc */}
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 16 }}>
+        <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
+          Lọc giao dịch
+        </Text>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
+          {['all', 'income', 'expense'].map(type => (
+            <Pressable
+              key={type}
+              onPress={() => setFilterType(type as any)}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 999,
+                borderWidth: 1.5,
+                borderColor: filterType === type ? tint : text + '44',
+                backgroundColor: filterType === type ? tint : 'transparent',
+              }}
+            >
+              <Text style={{ fontWeight: '700', color: filterType === type ? '#fff' : text }}>
+                {type === 'all' ? 'Tất cả' : type === 'income' ? 'Thu nhập' : 'Chi tiêu'}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+          <Pressable
+            onPress={() => setSelectedCategoryId(null)}
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 16,
+              borderRadius: 999,
+              borderWidth: 1.5,
+              borderColor: selectedCategoryId === null ? tint : text + '44',
+              backgroundColor: selectedCategoryId === null ? tint : 'transparent',
+            }}
+          >
+            <Text style={{ fontWeight: '700', color: selectedCategoryId === null ? '#fff' : text }}>
+              Tất cả danh mục
+            </Text>
+          </Pressable>
+
+          {Object.values(categoriesMap).map(cat => (
+            <Pressable
+              key={cat.id}
+              onPress={() => setSelectedCategoryId(cat.id)}
+              style={{
+                paddingVertical: 8,
+                paddingHorizontal: 16,
+                borderRadius: 999,
+                borderWidth: 1.5,
+                borderColor: selectedCategoryId === cat.id ? tint : text + '44',
+                backgroundColor: selectedCategoryId === cat.id ? tint : 'transparent',
+              }}
+            >
+              <Text style={{ fontWeight: '700', color: selectedCategoryId === cat.id ? '#fff' : text }}>
+                {cat.emoji ? `${cat.emoji} ` : ''}{cat.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Danh sách giao dịch - hiển thị ảnh icon_uri + emoji fallback */}
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+        <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
+          Giao dịch tháng {selectedMonth}/{selectedYear} ({filteredTransactions.length})
+        </Text>
+
+        {filteredTransactions.length === 0 ? (
+          <Text style={{ color: text + '88', textAlign: 'center', paddingVertical: 40, fontSize: 16 }}>
+            Không có giao dịch nào trong tháng này
+          </Text>
+        ) : (
+          filteredTransactions.map(tx => {
+            const category = categoriesMap[tx.category_id];
+            return (
+              <View
+                key={tx.id}
+                style={{
+                  flexDirection: 'row',
+                  padding: 12,
+                  borderRadius: 12,
+                  backgroundColor: bg,
+                  marginBottom: 8,
+                  borderWidth: 1,
+                  borderColor: text + '11',
+                }}
+              >
+                <View style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                  {category?.icon_uri ? (
+                    <Image
+                      source={{ uri: category.icon_uri }}
+                      style={{ width: 36, height: 36, borderRadius: 18 }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Text style={{ fontSize: 28 }}>
+                      {category?.emoji || '💰'}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: text }}>
+                      {category?.name || 'Không phân loại'}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 17,
+                        fontWeight: '900',
+                        color: tx.type === 'income' ? tint : '#ef4444',
+                      }}
+                    >
+                      {tx.type === 'income' ? '+' : '-'} {fmtMoney(Number(tx.amount))}
+                    </Text>
+                  </View>
+
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                    <Text style={{ color: text + '88', fontSize: 13 }}>
+                      {new Date(tx.occurred_at).toLocaleDateString('vi-VN', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                    <Text style={{ color: text + '88', fontSize: 13, flexShrink: 1, textAlign: 'right' }}>
+                      {tx.note?.trim() ? tx.note.trim() : '(không có ghi chú)'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })
         )}
       </View>
 
-      {/* Recent */}
-      <View style={{ padding: 14, borderRadius: 18, backgroundColor: card, borderWidth: 1, borderColor: text + "12" }}>
-        <Text style={{ fontSize: 16, fontWeight: "900", color: text, marginBottom: 10 }}>Giao dịch gần đây</Text>
-
-        {recent.map((t) => (
-          <View
-            key={t.id}
-            style={{
-              paddingVertical: 12,
-              paddingHorizontal: 12,
-              borderRadius: 14,
-              backgroundColor: bg,
-              borderWidth: 1,
-              borderColor: text + "10",
-              marginBottom: 10,
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ color: text, fontWeight: "900" }}>
-                {t.category} • {String(t.day).padStart(2, "0")}/{month}
-              </Text>
-              <Text style={{ color: t.type === "income" ? tint : text, fontWeight: "900" }}>
-                {t.type === "income" ? "+" : "-"}
-                {fmtMoney(t.amount)}
-              </Text>
-            </View>
-            <Text style={{ color: text + "AA", marginTop: 4 }}>{t.note}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={{ height: 10 }} />
+      <View style={{ height: 100 }} />
     </ScrollView>
   );
 }

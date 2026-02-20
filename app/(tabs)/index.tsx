@@ -304,7 +304,7 @@ export default function HomeScreen() {
                 </ThemedText>
               </View>
               
-              <Link href="/tab/explore" asChild>
+              <Link href="/tab/transactions" asChild>
                 <Pressable style={styles.viewAllBtn}>
                   <ThemedText style={styles.viewAllText}>Tất cả</ThemedText>
                   <ThemedText style={styles.viewAllArrow}>→</ThemedText>
