@@ -214,7 +214,7 @@ export default function HomeScreen() {
                 <ThemedText style={styles.subtitle}>{monthLabel}</ThemedText>
               </View>
 
-              <Link href="/modal" asChild>
+              <Link href="/tab/modal" asChild>
                 <Pressable 
                   style={({ pressed }) => [
                     styles.addButton,
@@ -290,7 +290,7 @@ export default function HomeScreen() {
               <QuickAction 
                 icon="🎯" 
                 label="Ngân sách" 
-                href="/explore"
+                href="tab/listbudgets"
                 gradient={['#8b5cf6', '#7c3aed']}
               />
             </View>
@@ -327,7 +327,7 @@ export default function HomeScreen() {
               <ThemedText style={styles.emptyDescription}>
                 Bắt đầu ghi chép thu chi của bạn ngay hôm nay
               </ThemedText>
-              <Link href="/modal" asChild>
+              <Link href="/tab/modal" asChild>
                 <Pressable style={styles.emptyButton}>
                   <ThemedText style={styles.emptyButtonText}>Thêm giao dịch đầu tiên</ThemedText>
                 </Pressable>

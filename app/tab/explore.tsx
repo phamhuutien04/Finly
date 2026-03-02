@@ -1,261 +1,829 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, StyleSheet, View } from "react-native";
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import {
+  Alert,
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+  Platform,
+} from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { supabase } from '@/lib/supabase';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { supabase } from "@/lib/supabase";
-
-type TxType = "income" | "expense";
-
-type BudgetRowDB = {
-  id: string;
-  category_id: string;
-  amount_limit: number;
-  start_date: string; // date
-  end_date: string; // date
-  category: { name: string | null; icon: string | null } | null;
+type Category = {
+  id: number;
+  name: string | null;
+  type: string | null;
 };
 
-type TxAggRowDB = {
-  category_id: string;
-  spent: number;
-};
+type PeriodType = 'daily' | 'weekly' | 'monthly' | 'custom';
 
-const formatVND = (n: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
-
-function getMonthLabel() {
-  const d = new Date();
-  return `Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
-}
-
-function getMonthRangeISO() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
-  return { startISO: start.toISOString(), endISO: end.toISOString() };
-}
-
-export default function ExploreScreen() {
+export default function BudgetFormScreen() {
   const router = useRouter();
+  const { id } = useLocalSearchParams<{ id?: string }>();
 
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
-  const [income, setIncome] = useState(0);
-  const [expense, setExpense] = useState(0);
+  const [amount, setAmount] = useState('');
+  const [period, setPeriod] = useState<PeriodType>('monthly');
 
-  const [budgets, setBudgets] = useState<BudgetRowDB[]>([]);
-  const [spentMap, setSpentMap] = useState<Record<string, number>>({}); // category_id -> spent
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
 
-  const monthLabel = useMemo(() => getMonthLabel(), []);
-  const monthRange = useMemo(() => getMonthRangeISO(), []);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Preset dates
+  const [presetOption, setPresetOption] = useState<'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom'>('this_month');
 
   useEffect(() => {
-    let mounted = true;
+    fetchExpenseCategories();
+    if (id) {
+      fetchBudget(Number(id));
+    } else {
+      updateDateRangeByPeriod(period);
+    }
+  }, [id]);
 
-    const load = async () => {
-      try {
-        setLoading(true);
+  // Cập nhật ngày theo period
+  const updateDateRangeByPeriod = (selectedPeriod: PeriodType) => {
+    const now = new Date();
+    let newStart = new Date(now);
+    let newEnd = new Date(now);
 
-        const { data: sess } = await supabase.auth.getSession();
-        const user = sess.session?.user;
-        if (!user) {
-          router.replace("/auth/login");
-          return;
-        }
+    switch (selectedPeriod) {
+      case 'daily':
+        // Hôm nay
+        newStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        newEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+        setPresetOption('custom');
+        break;
+      
+      case 'weekly':
+        // Tuần này (Thứ 2 - Chủ nhật)
+        const day = now.getDay(); // 0: Chủ nhật, 1: Thứ 2, ...
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        newStart.setDate(now.getDate() + diffToMonday);
+        newEnd = new Date(newStart);
+        newEnd.setDate(newStart.getDate() + 6);
+        setPresetOption('this_week');
+        break;
+      
+      case 'monthly':
+        // Tháng này
+        newStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        newEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        setPresetOption('this_month');
+        break;
+      
+      case 'custom':
+        // Giữ nguyên hoặc set mặc định 30 ngày
+        newEnd.setDate(now.getDate() + 30);
+        setPresetOption('custom');
+        break;
+    }
 
-        // 1) totals month
-        const { data: txRows, error: txErr } = await supabase
-          .from("transactions")
-          .select("amount,type,category_id,transaction_date")
-          .eq("user_id", user.id)
-          .gte("transaction_date", monthRange.startISO)
-          .lt("transaction_date", monthRange.endISO);
+    setStartDate(newStart);
+    setEndDate(newEnd);
+  };
 
-        if (txErr) throw txErr;
+  // Xử lý khi chọn period
+  const handlePeriodChange = (newPeriod: PeriodType) => {
+    setPeriod(newPeriod);
+    updateDateRangeByPeriod(newPeriod);
+  };
 
-        let inc = 0;
-        let exp = 0;
-        const map: Record<string, number> = {};
+  // Xử lý khi chọn preset
+  const handlePresetChange = (preset: 'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom') => {
+    const now = new Date();
+    let newStart = new Date(now);
+    let newEnd = new Date(now);
 
-        for (const r of txRows ?? []) {
-          const amt = Number((r as any).amount ?? 0);
-          const t = (r as any).type as TxType;
-          const cid = String((r as any).category_id ?? "");
+    switch (preset) {
+      case 'this_week':
+        const day = now.getDay();
+        const diffToMonday = day === 0 ? -6 : 1 - day;
+        newStart.setDate(now.getDate() + diffToMonday);
+        newEnd = new Date(newStart);
+        newEnd.setDate(newStart.getDate() + 6);
+        setPeriod('weekly');
+        break;
+      
+      case 'next_week':
+        const nextWeek = new Date(now);
+        nextWeek.setDate(now.getDate() + 7);
+        const nextDay = nextWeek.getDay();
+        const nextDiff = nextDay === 0 ? -6 : 1 - nextDay;
+        newStart.setDate(nextWeek.getDate() + nextDiff);
+        newEnd = new Date(newStart);
+        newEnd.setDate(newStart.getDate() + 6);
+        setPeriod('weekly');
+        break;
+      
+      case 'this_month':
+        newStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        newEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+        setPeriod('monthly');
+        break;
+      
+      case 'next_month':
+        const nextMonth = now.getMonth() + 1;
+        const nextYear = nextMonth > 11 ? now.getFullYear() + 1 : now.getFullYear();
+        const month = nextMonth > 11 ? 0 : nextMonth;
+        newStart = new Date(nextYear, month, 1);
+        newEnd = new Date(nextYear, month + 1, 0, 23, 59, 59);
+        setPeriod('monthly');
+        break;
+      
+      case 'custom':
+        setPeriod('custom');
+        break;
+    }
 
-          if (t === "income") inc += amt;
-          else {
-            exp += amt;
-            if (cid) map[cid] = (map[cid] ?? 0) + amt; // spent per category
-          }
-        }
+    setStartDate(newStart);
+    setEndDate(newEnd);
+    setPresetOption(preset);
+  };
 
-        // 2) budgets + join category
-        const { data: bRows, error: bErr } = await supabase
-          .from("budgets")
-          .select(
-            `
-            id,
-            category_id,
-            amount_limit,
-            start_date,
-            end_date,
-            category:categories ( name, icon )
-          `
-          )
-          .eq("user_id", user.id)
-          .order("end_date", { ascending: true })
-          .returns<BudgetRowDB[]>();
+  const fetchExpenseCategories = async () => {
+    setLoadingCategories(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
 
-        if (bErr) throw bErr;
-
-        if (!mounted) return;
-
-        setIncome(inc);
-        setExpense(exp);
-        setSpentMap(map);
-        setBudgets(bRows ?? []);
-      } catch (e: any) {
-        Alert.alert("Lỗi", e?.message ?? "Không tải được explore.");
-      } finally {
-        if (mounted) setLoading(false);
+      if (!uid) {
+        Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+        return;
       }
+
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name, type')
+        .eq('type', 'expense')
+        .or(`user_id.eq.${uid},user_id.is.null`)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (err: any) {
+      Alert.alert('Lỗi', err.message);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const fetchBudget = async (budgetId: number) => {
+    try {
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('category_id, amount, period, start_date, end_date')
+        .eq('id', budgetId)
+        .single();
+
+      if (error) throw error;
+      if (!data) return Alert.alert('Không tìm thấy');
+
+      setSelectedCategoryId(data.category_id);
+      setAmount(data.amount.toString());
+      setPeriod(data.period as PeriodType);
+      setStartDate(new Date(data.start_date));
+      setEndDate(new Date(data.end_date));
+    } catch (err: any) {
+      Alert.alert('Lỗi', err.message);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!amount || Number(amount) <= 0) {
+      return Alert.alert('Lỗi', 'Số tiền phải lớn hơn 0');
+    }
+    if (!selectedCategoryId) {
+      return Alert.alert('Lỗi', 'Vui lòng chọn hạng mục');
+    }
+    if (startDate > endDate) {
+      return Alert.alert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc');
+    }
+
+    setSaving(true);
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+      setSaving(false);
+      return Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+    }
+
+    const payload = {
+      user_id: session.user.id,
+      category_id: selectedCategoryId,
+      amount: Number(amount),
+      period,
+      start_date: startDate.toISOString().split('T')[0],
+      end_date: endDate.toISOString().split('T')[0],
     };
 
-    load();
+    let result;
+    if (id) {
+      result = await supabase.from('budgets').update(payload).eq('id', Number(id));
+    } else {
+      result = await supabase.from('budgets').insert([payload]);
+    }
 
-    return () => {
-      mounted = false;
-    };
-  }, [router, monthRange.startISO, monthRange.endISO]);
+    setSaving(false);
 
-  const balance = income - expense;
+    if (result.error) {
+      Alert.alert('Lỗi', result.error.message);
+    } else {
+      Alert.alert('Thành công', id ? 'Đã cập nhật' : 'Đã tạo ngân sách');
+      router.back();
+    }
+  };
+
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
 
   return (
-    <ThemedView style={styles.screen}>
-      <ThemedText type="title">Báo cáo</ThemedText>
-      <ThemedText style={{ opacity: 0.7, marginBottom: 12 }}>{monthLabel}</ThemedText>
-
-      {/* Summary */}
-      <View style={styles.summaryRow}>
-        <Box label="Số dư" value={formatVND(balance)} />
-        <Box label="Thu nhập" value={formatVND(income)} />
-        <Box label="Chi tiêu" value={formatVND(expense)} />
-      </View>
-
-      <ThemedText type="subtitle" style={{ marginTop: 6, marginBottom: 10 }}>
-        Ngân sách
-      </ThemedText>
-
-      {loading ? (
-        <View style={{ paddingTop: 18 }}>
-          <ActivityIndicator />
+    <ThemedView style={styles.container}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          <ThemedText style={styles.headerTitle}>
+            {id ? '✏️ Chỉnh sửa ngân sách' : '💰 Đặt ngân sách mới'}
+          </ThemedText>
+          <View style={{ width: 40 }} />
         </View>
-      ) : (
-        <FlatList
-          data={budgets}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 24 }}
-          ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-          renderItem={({ item }) => (
-            <BudgetCard
-              name={(item.category?.icon ? item.category.icon + " " : "") + (item.category?.name ?? "Khác")}
-              limit={Number(item.amount_limit ?? 0)}
-              spent={Number(spentMap[item.category_id] ?? 0)}
-              range={`${item.start_date} → ${item.end_date}`}
+
+        {/* Categories */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>📋 Chọn hạng mục chi tiêu</ThemedText>
+          
+          {loadingCategories ? (
+            <View style={styles.centerLoading}>
+              <ActivityIndicator size="large" color="#ef4444" />
+              <ThemedText style={styles.loadingText}>Đang tải...</ThemedText>
+            </View>
+          ) : categories.length === 0 ? (
+            <View style={styles.centerEmpty}>
+              <Text style={styles.emptyIcon}>📁</Text>
+              <ThemedText style={styles.emptyText}>Chưa có hạng mục nào</ThemedText>
+              <ThemedText style={styles.emptySubtext}>
+                Tạo hạng mục chi tiêu trong mục "Danh mục"
+              </ThemedText>
+            </View>
+          ) : (
+            <View style={styles.categoryGrid}>
+              {categories.map(cat => {
+                const isSelected = selectedCategoryId === cat.id;
+                return (
+                  <TouchableOpacity
+                    key={cat.id}
+                    style={[
+                      styles.categoryItem,
+                      isSelected && styles.categoryItemSelected,
+                    ]}
+                    onPress={() => setSelectedCategoryId(cat.id)}
+                  >
+                    <Text style={[styles.categoryIcon, isSelected && { color: '#fff' }]}>
+                    </Text>
+                    <ThemedText
+                      style={[
+                        styles.categoryText,
+                        isSelected && { color: '#fff' },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {cat.name || 'Không tên'}
+                    </ThemedText>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* Amount */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>💰 Giới hạn chi tiêu</ThemedText>
+          <View style={styles.amountInputContainer}>
+            <Text style={styles.currencyLabel}>VNĐ</Text>
+            <TextInput
+              style={styles.amountInput}
+              value={amount}
+              onChangeText={setAmount}
+              keyboardType="numeric"
+              placeholder="Nhập số tiền"
+              placeholderTextColor="#999"
+            />
+          </View>
+        </View>
+
+        {/* Period Selection */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>📅 Chu kỳ</ThemedText>
+          
+          <View style={styles.periodRow}>
+            <TouchableOpacity
+              style={[
+                styles.periodBtn,
+                period === 'daily' && styles.periodBtnActive,
+              ]}
+              onPress={() => handlePeriodChange('daily')}
+            >
+              <Text style={[styles.periodBtnIcon, period === 'daily' && styles.periodBtnTextActive]}>📅</Text>
+              <Text style={[styles.periodBtnText, period === 'daily' && styles.periodBtnTextActive]}>
+                Ngày
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.periodBtn,
+                period === 'weekly' && styles.periodBtnActive,
+              ]}
+              onPress={() => handlePeriodChange('weekly')}
+            >
+              <Text style={[styles.periodBtnIcon, period === 'weekly' && styles.periodBtnTextActive]}>📆</Text>
+              <Text style={[styles.periodBtnText, period === 'weekly' && styles.periodBtnTextActive]}>
+                Tuần
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.periodBtn,
+                period === 'monthly' && styles.periodBtnActive,
+              ]}
+              onPress={() => handlePeriodChange('monthly')}
+            >
+              <Text style={[styles.periodBtnIcon, period === 'monthly' && styles.periodBtnTextActive]}>📅</Text>
+              <Text style={[styles.periodBtnText, period === 'monthly' && styles.periodBtnTextActive]}>
+                Tháng
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.periodBtn,
+                period === 'custom' && styles.periodBtnActive,
+              ]}
+              onPress={() => handlePeriodChange('custom')}
+            >
+              <Text style={[styles.periodBtnIcon, period === 'custom' && styles.periodBtnTextActive]}>⚙️</Text>
+              <Text style={[styles.periodBtnText, period === 'custom' && styles.periodBtnTextActive]}>
+                Tùy chỉnh
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Preset Options */}
+        {period !== 'custom' && (
+          <View style={styles.section}>
+            <ThemedText style={styles.sectionTitle}>🎯 Chọn khoảng thời gian</ThemedText>
+            
+            <View style={styles.presetRow}>
+              {(period === 'weekly' || period === 'monthly') && (
+                <>
+                  <TouchableOpacity
+                    style={[
+                      styles.presetBtn,
+                      presetOption === `this_${period}` && styles.presetBtnActive,
+                    ]}
+                    onPress={() => handlePresetChange(period === 'weekly' ? 'this_week' : 'this_month')}
+                  >
+                    <Text style={[
+                      styles.presetBtnText,
+                      presetOption === `this_${period}` && styles.presetBtnTextActive
+                    ]}>
+                      {period === 'weekly' ? '📅 Tuần này' : '📅 Tháng này'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.presetBtn,
+                      presetOption === `next_${period}` && styles.presetBtnActive,
+                    ]}
+                    onPress={() => handlePresetChange(period === 'weekly' ? 'next_week' : 'next_month')}
+                  >
+                    <Text style={[
+                      styles.presetBtnText,
+                      presetOption === `next_${period}` && styles.presetBtnTextActive
+                    ]}>
+                      {period === 'weekly' ? '📅 Tuần sau' : '📅 Tháng sau'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Date Range */}
+        <View style={styles.section}>
+          <ThemedText style={styles.sectionTitle}>📆 Khoảng thời gian</ThemedText>
+          
+          <View style={styles.dateRangeContainer}>
+            <View style={styles.dateBox}>
+              <Text style={styles.dateLabel}>Từ ngày</Text>
+              <TouchableOpacity 
+                style={styles.dateButton}
+                onPress={() => setShowStartPicker(true)}
+              >
+                <Text style={styles.dateIcon}>📅</Text>
+                <Text style={styles.dateText}>{formatDate(startDate)}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.dateArrow}>→</Text>
+
+            <View style={styles.dateBox}>
+              <Text style={styles.dateLabel}>Đến ngày</Text>
+              <TouchableOpacity 
+                style={styles.dateButton}
+                onPress={() => setShowEndPicker(true)}
+              >
+                <Text style={styles.dateIcon}>📅</Text>
+                <Text style={styles.dateText}>{formatDate(endDate)}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Date Pickers */}
+          {showStartPicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowStartPicker(Platform.OS === 'ios');
+                if (date) {
+                  setStartDate(date);
+                  setPeriod('custom');
+                  setPresetOption('custom');
+                }
+              }}
             />
           )}
-          ListEmptyComponent={
-            <ThemedText style={{ opacity: 0.7, textAlign: "center", marginTop: 8 }}>
-              Chưa có budget nào (bảng budgets).
-            </ThemedText>
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      )}
-    </ThemedView>
-  );
-}
 
-function Box({ label, value }: { label: string; value: string }) {
-  return (
-    <ThemedView style={styles.box}>
-      <ThemedText style={{ opacity: 0.75, fontSize: 12, fontWeight: "800" }}>{label}</ThemedText>
-      <ThemedText style={{ fontSize: 14, fontWeight: "900", marginTop: 4 }}>{value}</ThemedText>
-    </ThemedView>
-  );
-}
-
-function BudgetCard({
-  name,
-  limit,
-  spent,
-  range,
-}: {
-  name: string;
-  limit: number;
-  spent: number;
-  range: string;
-}) {
-  const pct = limit > 0 ? Math.min(1, spent / limit) : 0;
-  const pctText = `${Math.round(pct * 100)}%`;
-
-  return (
-    <ThemedView style={styles.budgetCard}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <ThemedText style={{ fontWeight: "900" }}>{name}</ThemedText>
-          <ThemedText style={{ opacity: 0.7, marginTop: 2 }}>{range}</ThemedText>
+          {showEndPicker && (
+            <DateTimePicker
+              value={endDate}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowEndPicker(Platform.OS === 'ios');
+                if (date) {
+                  setEndDate(date);
+                  setPeriod('custom');
+                  setPresetOption('custom');
+                }
+              }}
+            />
+          )}
         </View>
-        <ThemedText style={{ fontWeight: "900" }}>{pctText}</ThemedText>
-      </View>
 
-      <View style={styles.progressTrack}>
-        <View style={[styles.progressFill, { width: `${pct * 100}%` }]} />
-      </View>
+        {/* Summary */}
+        {selectedCategoryId && amount && (
+          <View style={styles.summarySection}>
+            <ThemedText style={styles.summaryTitle}>📊 Tóm tắt</ThemedText>
+            
+            <View style={styles.summaryRow}>
+              <ThemedText style={styles.summaryLabel}>Hạng mục:</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {categories.find(c => c.id === selectedCategoryId)?.name || 'Đã chọn'}
+              </ThemedText>
+            </View>
 
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 8 }}>
-        <ThemedText style={{ opacity: 0.8, fontWeight: "800" }}>
-          Đã chi: {formatVND(spent)}
-        </ThemedText>
-        <ThemedText style={{ opacity: 0.8, fontWeight: "800" }}>
-          Limit: {formatVND(limit)}
-        </ThemedText>
-      </View>
+            <View style={styles.summaryRow}>
+              <ThemedText style={styles.summaryLabel}>Giới hạn:</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {Number(amount).toLocaleString()} VNĐ
+              </ThemedText>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <ThemedText style={styles.summaryLabel}>Thời gian:</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} ngày
+              </ThemedText>
+            </View>
+
+            <View style={styles.summaryRow}>
+              <ThemedText style={styles.summaryLabel}>Trung bình/ngày:</ThemedText>
+              <ThemedText style={styles.summaryValue}>
+                {Math.round(Number(amount) / Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))).toLocaleString()} VNĐ
+              </ThemedText>
+            </View>
+          </View>
+        )}
+
+        {/* Save Button */}
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            (saving || loadingCategories) && styles.saveButtonDisabled
+          ]}
+          onPress={handleSave}
+          disabled={saving || loadingCategories}
+        >
+          {saving ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <>
+              <Text style={styles.saveButtonIcon}>💾</Text>
+              <Text style={styles.saveButtonText}>
+                {id ? 'Cập nhật ngân sách' : 'Tạo ngân sách'}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
-
-  summaryRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
-  box: {
+  container: {
     flex: 1,
+    padding: 16,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingVertical: 8,
+  },
+  backButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: '#333',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  section: {
+    backgroundColor: '#FFF',
     borderRadius: 16,
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
-
-  budgetCard: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  centerLoading: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+  },
+  centerEmpty: {
+    padding: 30,
+    alignItems: 'center',
+  },
+  emptyIcon: {
+    fontSize: 48,
+    color: '#CCC',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
+  },
+  emptySubtext: {
+    fontSize: 12,
+    color: '#CCC',
+    marginTop: 4,
+  },
+  categoryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#FFF',
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  categoryItemSelected: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  categoryIcon: {
+    fontSize: 16,
+    color: '#ef4444',
+  },
+  categoryText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#ef4444',
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  currencyLabel: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#F5F5F5',
+    color: '#666',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  amountInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#333',
+  },
+  periodRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  periodBtn: {
+    flex: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  periodBtnActive: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  periodBtnIcon: {
+    fontSize: 20,
+  },
+  periodBtnText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  periodBtnTextActive: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  presetBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  presetBtnActive: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
+  presetBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666',
+  },
+  presetBtnTextActive: {
+    color: '#FFF',
+  },
+  dateRangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dateBox: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 6,
+  },
+  dateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 12,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  dateIcon: {
+    fontSize: 18,
+  },
+  dateText: {
+    fontSize: 13,
+    color: '#333',
+    flex: 1,
+  },
+  dateArrow: {
+    fontSize: 20,
+    color: '#999',
+    marginTop: 20,
+  },
+  summarySection: {
+    backgroundColor: '#FFF9F9',
     borderRadius: 16,
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ef4444',
   },
-
-  progressTrack: {
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: "rgba(127,127,127,0.18)",
-    marginTop: 10,
-    overflow: "hidden",
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
+    marginBottom: 12,
   },
-  progressFill: {
-    height: "100%",
-    borderRadius: 999,
-    backgroundColor: "rgba(0,0,0,0.65)",
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE5E5',
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#ef4444',
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.5,
+  },
+  saveButtonIcon: {
+    fontSize: 20,
+    color: '#FFF',
+  },
+  saveButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

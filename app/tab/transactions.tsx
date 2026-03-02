@@ -11,7 +11,6 @@ import {
   RefreshControl,
   Image,
   Platform,
-  Modal,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
@@ -28,8 +27,8 @@ type TransactionUI = {
   type: TxType;
   amount: number;
   time: string;
-  date: string; // "dd/mm/yyyy"
-  dateObject: Date | null; // Lưu date object
+  date: string;
+  dateObject: Date | null;
   iconEmoji?: string | null;
   iconUri?: string | null;
 };
@@ -44,6 +43,41 @@ function formatDateLabel(date: Date | null) {
     .padStart(2, "0")}/${date.getFullYear()}`;
 }
 
+// Web DatePicker Component - Đơn giản
+const WebDatePicker = ({ value, onChange }: { value: Date; onChange: (date: Date) => void }) => {
+  const formatDateForInput = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateStr = e.target.value;
+    if (dateStr) {
+      const newDate = new Date(dateStr + 'T00:00:00');
+      onChange(newDate);
+    }
+  };
+
+  return (
+    <input
+      type="date"
+      value={formatDateForInput(value)}
+      onChange={handleChange}
+      style={{
+        padding: '12px',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        backgroundColor: '#f1f5f9',
+        fontSize: '16px',
+        width: '100%',
+        marginTop: '8px',
+      }}
+    />
+  );
+};
+
 export default function AllTransactionsScreen() {
   const router = useRouter();
 
@@ -54,11 +88,9 @@ export default function AllTransactionsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<TxType>("all");
 
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
-  const [startDate, setStartDate] = useState<Date | null>(null);
-  const [endDate, setEndDate] = useState<Date | null>(null);
-  const [quickFilter, setQuickFilter] = useState<string | null>(null);
+  // CHỈ 1 NGÀY DUY NHẤT
+  const [showPicker, setShowPicker] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // Load tất cả transactions
   const loadTransactions = async () => {
@@ -93,7 +125,6 @@ export default function AllTransactionsScreen() {
         const title = r.note?.trim() || catName;
         const timeIso = r.occurred_at || r.created_at || "";
         
-        // Tạo date object từ ISO string
         let dateObj: Date | null = null;
         let dateStr = "Không rõ";
         let timeStr = "";
@@ -126,9 +157,7 @@ export default function AllTransactionsScreen() {
         };
       });
 
-      console.log("Loaded transactions:", mapped.length);
       setTxs(mapped);
-      applyFilters(mapped); // Áp dụng filter ngay sau khi load
     } catch (e: any) {
       Alert.alert("Lỗi", "Không tải được giao dịch.");
     } finally {
@@ -136,20 +165,16 @@ export default function AllTransactionsScreen() {
     }
   };
 
-  // Hàm áp dụng tất cả filters
-  const applyFilters = (transactions: TransactionUI[]) => {
-    console.log("Applying filters...");
-    console.log("Start date:", startDate?.toISOString());
-    console.log("End date:", endDate?.toISOString());
+  // Filter transactions theo ngày được chọn
+  useEffect(() => {
+    if (!txs.length) return;
     
-    let result = [...transactions];
+    let result = [...txs];
 
-    // Filter theo loại
     if (filterType !== "all") {
       result = result.filter((tx) => tx.type === filterType);
     }
 
-    // Filter theo search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase().trim();
       result = result.filter(
@@ -159,98 +184,35 @@ export default function AllTransactionsScreen() {
       );
     }
 
-    // Filter theo ngày bắt đầu
-    if (startDate) {
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
-      console.log("Start filter date (start of day):", start.toISOString());
+    // Lọc theo ngày được chọn
+    if (selectedDate) {
+      const selected = new Date(selectedDate);
+      selected.setHours(0, 0, 0, 0);
       
       result = result.filter((tx) => {
         if (!tx.dateObject) return false;
-        
         const txDate = new Date(tx.dateObject);
         txDate.setHours(0, 0, 0, 0);
-        console.log(`Transaction ${tx.id} date:`, txDate.toISOString(), ">=", start.toISOString(), "?", txDate >= start);
-        
-        return txDate >= start;
+        return txDate.getTime() === selected.getTime();
       });
     }
 
-    // Filter theo ngày kết thúc
-    if (endDate) {
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      console.log("End filter date (end of day):", end.toISOString());
-      
-      result = result.filter((tx) => {
-        if (!tx.dateObject) return false;
-        
-        const txDate = new Date(tx.dateObject);
-        txDate.setHours(0, 0, 0, 0);
-        console.log(`Transaction ${tx.id} date:`, txDate.toISOString(), "<=", end.toISOString(), "?", txDate <= end);
-        
-        return txDate <= end;
-      });
-    }
-
-    console.log("Filtered result count:", result.length);
     setFilteredTxs(result);
-  };
+  }, [txs, filterType, searchQuery, selectedDate]);
 
   // Load khi mount
   useEffect(() => {
     loadTransactions();
   }, []);
 
-  // Áp dụng filters khi các filter thay đổi
-  useEffect(() => {
-    if (txs.length > 0) {
-      applyFilters(txs);
-    }
-  }, [txs, filterType, searchQuery, startDate, endDate]);
-
-  // Quick filter functions
-  const applyQuickFilter = (filter: string) => {
-    setQuickFilter(filter);
-    if (filter === "today") {
-      const today = new Date();
-      setStartDate(today);
-      setEndDate(today);
-    } else if (filter === "thisMonth") {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      setStartDate(firstDay);
-      setEndDate(lastDay);
-    } else if (filter === "lastMonth") {
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-      setStartDate(firstDay);
-      setEndDate(lastDay);
-    } else if (filter === "clear") {
-      setQuickFilter(null);
-      setStartDate(null);
-      setEndDate(null);
-    }
+  // Quick filters
+  const selectToday = () => {
+    setSelectedDate(new Date());
+    setShowPicker(false);
   };
 
-  const clearStartDate = () => {
-    setStartDate(null);
-    setQuickFilter(null);
-  };
-
-  const clearEndDate = () => {
-    setEndDate(null);
-    setQuickFilter(null);
-  };
-
-  const clearAllFilters = () => {
-    setStartDate(null);
-    setEndDate(null);
-    setQuickFilter(null);
-    setFilterType("all");
-    setSearchQuery("");
+  const clearDate = () => {
+    setSelectedDate(null);
   };
 
   const onRefresh = async () => {
@@ -259,32 +221,21 @@ export default function AllTransactionsScreen() {
     setRefreshing(false);
   };
 
-  // Xử lý DateTimePicker
-  const onStartDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowStartPicker(false);
-    }
-    
-    if (selectedDate) {
-      console.log("Selected start date:", selectedDate.toISOString());
-      setStartDate(selectedDate);
-      setQuickFilter(null);
+  // Xử lý khi chọn ngày - Android/iOS
+  const onDateChange = (event: any, date?: Date) => {
+    setShowPicker(false);
+    if (date) {
+      setSelectedDate(date);
     }
   };
 
-  const onEndDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowEndPicker(false);
-    }
-    
-    if (selectedDate) {
-      console.log("Selected end date:", selectedDate.toISOString());
-      setEndDate(selectedDate);
-      setQuickFilter(null);
-    }
+  // Xử lý khi chọn ngày - Web
+  const onDateChangeWeb = (date: Date) => {
+    setSelectedDate(date);
+    setShowPicker(false);
   };
 
-  // Tính tổng số tiền
+  // Tính tổng
   const calculateTotal = () => {
     return filteredTxs.reduce((sum, tx) => {
       if (tx.type === "income") return sum + tx.amount;
@@ -305,92 +256,13 @@ export default function AllTransactionsScreen() {
       .reduce((sum, tx) => sum + tx.amount, 0);
   };
 
-  // Hàm hiển thị DatePicker
-  const renderDatePicker = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <Modal
-          visible={showStartPicker || showEndPicker}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => {
-            setShowStartPicker(false);
-            setShowEndPicker(false);
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Pressable 
-                  style={styles.modalCancelButton}
-                  onPress={() => {
-                    setShowStartPicker(false);
-                    setShowEndPicker(false);
-                  }}
-                >
-                  <ThemedText style={styles.modalCancelText}>Hủy</ThemedText>
-                </Pressable>
-                <ThemedText style={styles.modalTitle}>
-                  {showStartPicker ? "Chọn ngày bắt đầu" : "Chọn ngày kết thúc"}
-                </ThemedText>
-                <Pressable 
-                  style={styles.modalDoneButton}
-                  onPress={() => {
-                    setShowStartPicker(false);
-                    setShowEndPicker(false);
-                  }}
-                >
-                  <ThemedText style={styles.modalDoneText}>Xong</ThemedText>
-                </Pressable>
-              </View>
-              <DateTimePicker
-                value={showStartPicker ? (startDate || new Date()) : (endDate || new Date())}
-                mode="date"
-                display="spinner"
-                onChange={showStartPicker ? onStartDateChange : onEndDateChange}
-                maximumDate={showStartPicker ? (endDate || new Date()) : new Date()}
-                minimumDate={showStartPicker ? undefined : (startDate || undefined)}
-                style={styles.datePicker}
-              />
-            </View>
-          </View>
-        </Modal>
-      );
-    } else {
-      if (showStartPicker) {
-        return (
-          <DateTimePicker
-            value={startDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={onStartDateChange}
-            maximumDate={endDate || new Date()}
-          />
-        );
-      }
-      if (showEndPicker) {
-        return (
-          <DateTimePicker
-            value={endDate || new Date()}
-            mode="date"
-            display="default"
-            onChange={onEndDateChange}
-            minimumDate={startDate || undefined}
-            maximumDate={new Date()}
-          />
-        );
-      }
-      return null;
-    }
-  };
-
   return (
     <ThemedView style={styles.screen}>
       <View style={styles.header}>
         <ThemedText style={styles.title}>Tất cả giao dịch</ThemedText>
         <ThemedText style={styles.subtitle}>
           {filteredTxs.length} giao dịch
-          {(startDate || endDate || quickFilter) && " (đã lọc)"}
+          {selectedDate && " (đã lọc)"}
         </ThemedText>
         
         {filteredTxs.length > 0 && (
@@ -435,45 +307,15 @@ export default function AllTransactionsScreen() {
           <Pressable
             style={[
               styles.quickFilterButton,
-              quickFilter === "today" && styles.quickFilterButtonActive,
+              selectedDate && styles.quickFilterButtonActive,
             ]}
-            onPress={() => applyQuickFilter("today")}
+            onPress={selectToday}
           >
             <ThemedText style={[
               styles.quickFilterText,
-              quickFilter === "today" && styles.quickFilterTextActive,
+              selectedDate && styles.quickFilterTextActive,
             ]}>
               Hôm nay
-            </ThemedText>
-          </Pressable>
-          
-          <Pressable
-            style={[
-              styles.quickFilterButton,
-              quickFilter === "thisMonth" && styles.quickFilterButtonActive,
-            ]}
-            onPress={() => applyQuickFilter("thisMonth")}
-          >
-            <ThemedText style={[
-              styles.quickFilterText,
-              quickFilter === "thisMonth" && styles.quickFilterTextActive,
-            ]}>
-              Tháng này
-            </ThemedText>
-          </Pressable>
-          
-          <Pressable
-            style={[
-              styles.quickFilterButton,
-              quickFilter === "lastMonth" && styles.quickFilterButtonActive,
-            ]}
-            onPress={() => applyQuickFilter("lastMonth")}
-          >
-            <ThemedText style={[
-              styles.quickFilterText,
-              quickFilter === "lastMonth" && styles.quickFilterTextActive,
-            ]}>
-              Tháng trước
             </ThemedText>
           </Pressable>
         </View>
@@ -500,70 +342,46 @@ export default function AllTransactionsScreen() {
           ))}
         </View>
 
+        {/* PHẦN CHỌN NGÀY ĐƠN GIẢN */}
         <View style={styles.dateFilter}>
           <ThemedText style={styles.dateFilterTitle}>Lọc theo ngày:</ThemedText>
           
-          <View style={styles.dateInputRow}>
-            <View style={styles.dateInputContainer}>
-              <ThemedText style={styles.dateLabel}>Từ ngày</ThemedText>
-              <View style={styles.dateInputWrapper}>
-                <Pressable 
-                  style={[
-                    styles.dateInputButton,
-                    startDate && styles.dateInputButtonActive
-                  ]} 
-                  onPress={() => setShowStartPicker(true)}
-                >
-                  <ThemedText style={styles.dateInputButtonText}>
-                    {startDate ? formatDateLabel(startDate) : "Chọn ngày"}
-                  </ThemedText>
-                </Pressable>
-                {startDate && (
-                  <Pressable style={styles.clearDateButton} onPress={clearStartDate}>
-                    <ThemedText style={styles.clearDateText}>✕</ThemedText>
-                  </Pressable>
-                )}
-              </View>
-            </View>
+          <Pressable 
+            style={[
+              styles.dateButton,
+              selectedDate && styles.dateButtonActive
+            ]} 
+            onPress={() => setShowPicker(true)}
+          >
+            <ThemedText style={styles.dateButtonText}>
+              {selectedDate ? formatDateLabel(selectedDate) : "Chọn ngày"}
+            </ThemedText>
+          </Pressable>
 
-            <View style={styles.dateInputContainer}>
-              <ThemedText style={styles.dateLabel}>Đến ngày</ThemedText>
-              <View style={styles.dateInputWrapper}>
-                <Pressable 
-                  style={[
-                    styles.dateInputButton,
-                    endDate && styles.dateInputButtonActive
-                  ]} 
-                  onPress={() => setShowEndPicker(true)}
-                >
-                  <ThemedText style={styles.dateInputButtonText}>
-                    {endDate ? formatDateLabel(endDate) : "Chọn ngày"}
-                  </ThemedText>
-                </Pressable>
-                {endDate && (
-                  <Pressable style={styles.clearDateButton} onPress={clearEndDate}>
-                    <ThemedText style={styles.clearDateText}>✕</ThemedText>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          </View>
-
-          {(startDate || endDate) && (
-            <View style={styles.selectedDateInfo}>
-              <ThemedText style={styles.selectedDateText}>
-                Đã chọn: {formatDateLabel(startDate)} - {formatDateLabel(endDate)}
-              </ThemedText>
-            </View>
-          )}
-
-          {(startDate || endDate || filterType !== "all" || searchQuery) && (
-            <Pressable style={styles.clearAllButton} onPress={clearAllFilters}>
-              <ThemedText style={styles.clearAllText}>Xóa tất cả bộ lọc</ThemedText>
+          {selectedDate && (
+            <Pressable style={styles.clearButton} onPress={clearDate}>
+              <ThemedText style={styles.clearButtonText}>Xóa lọc ngày</ThemedText>
             </Pressable>
           )}
         </View>
       </View>
+
+      {/* DatePicker - ĐƠN GIẢN CHO MỌI NỀN TẢNG */}
+      {showPicker && Platform.OS === 'web' && (
+        <WebDatePicker
+          value={selectedDate || new Date()}
+          onChange={onDateChangeWeb}
+        />
+      )}
+
+      {showPicker && Platform.OS !== 'web' && (
+        <DateTimePicker
+          value={selectedDate || new Date()}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'inline' : 'default'}
+          onChange={onDateChange}
+        />
+      )}
 
       <FlatList
         data={filteredTxs}
@@ -587,22 +405,17 @@ export default function AllTransactionsScreen() {
             <View style={styles.emptyState}>
               <ThemedText style={styles.emptyTitle}>Không tìm thấy giao dịch</ThemedText>
               <ThemedText style={styles.emptyDescription}>
-                {searchQuery || startDate || endDate || filterType !== "all"
+                {searchQuery || selectedDate || filterType !== "all"
                   ? "Thử thay đổi bộ lọc tìm kiếm"
                   : "Hãy thêm giao dịch đầu tiên của bạn"}
               </ThemedText>
-              {(searchQuery || startDate || endDate || filterType !== "all") && (
-                <Pressable style={styles.clearEmptyButton} onPress={clearAllFilters}>
-                  <ThemedText style={styles.clearEmptyText}>Xóa bộ lọc</ThemedText>
-                </Pressable>
-              )}
             </View>
           )
         }
         renderItem={({ item }) => (
           <Pressable 
             style={styles.txCard}
-            onPress={() => router.push(`/transaction/${item.id}`)}
+            // onPress={() => router.push(`/transaction/${item.id}`)}
           >
             <View style={styles.txIconWrapper}>
               {item.iconUri ? (
@@ -635,8 +448,6 @@ export default function AllTransactionsScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
-
-      {renderDatePicker()}
     </ThemedView>
   );
 }
@@ -713,13 +524,12 @@ const styles = StyleSheet.create({
   },
   quickFilterContainer: {
     flexDirection: "row",
-    gap: 8,
     marginBottom: 12,
   },
   quickFilterButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
     backgroundColor: "#f1f5f9",
     borderWidth: 1,
     borderColor: "#e2e8f0",
@@ -729,7 +539,7 @@ const styles = StyleSheet.create({
     borderColor: "#6366f1",
   },
   quickFilterText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: "600",
     color: "#64748b",
   },
@@ -742,10 +552,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   typeButton: {
-    paddingVertical: 8,
+    flex: 1,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
     backgroundColor: "#f1f5f9",
+    alignItems: "center",
   },
   typeButtonActive: {
     backgroundColor: "#6366f1",
@@ -767,76 +579,30 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     marginBottom: 4,
   },
-  dateInputRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  dateInputContainer: {
-    flex: 1,
-  },
-  dateLabel: {
-    fontSize: 12,
-    color: "#64748b",
-    fontWeight: "600",
-    marginBottom: 6,
-  },
-  dateInputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  dateInputButton: {
-    flex: 1,
+  dateButton: {
     backgroundColor: "#f1f5f9",
     borderWidth: 1,
     borderColor: "#e2e8f0",
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     alignItems: "center",
   },
-  dateInputButtonActive: {
+  dateButtonActive: {
     borderColor: "#6366f1",
     backgroundColor: "#eef2ff",
   },
-  dateInputButtonText: {
+  dateButtonText: {
     color: "#0f172a",
     fontWeight: "600",
-    fontSize: 14,
+    fontSize: 16,
   },
-  selectedDateInfo: {
-    backgroundColor: "#f0f9ff",
-    padding: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#bae6fd",
-  },
-  selectedDateText: {
-    color: "#0369a1",
-    fontSize: 12,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  clearDateButton: {
+  clearButton: {
     backgroundColor: "#ef4444",
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  clearDateText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  clearAllButton: {
-    backgroundColor: "#94a3b8",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    padding: 12,
     borderRadius: 12,
-    alignSelf: "flex-start",
+    alignItems: "center",
   },
-  clearAllText: {
+  clearButtonText: {
     color: "#ffffff",
     fontWeight: "600",
     fontSize: 14,
@@ -920,63 +686,5 @@ const styles = StyleSheet.create({
     color: "#94a3b8",
     textAlign: "center",
     marginBottom: 20,
-  },
-  clearEmptyButton: {
-    backgroundColor: "#6366f1",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
-  clearEmptyText: {
-    color: "#ffffff",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 20,
-    maxHeight: '50%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-    flex: 1,
-    textAlign: 'center',
-  },
-  modalCancelButton: {
-    padding: 8,
-  },
-  modalCancelText: {
-    color: '#64748b',
-    fontSize: 16,
-  },
-  modalDoneButton: {
-    padding: 8,
-  },
-  modalDoneText: {
-    color: '#6366f1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  datePicker: {
-    height: 200,
-    width: '100%',
   },
 });
