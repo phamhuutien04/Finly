@@ -1,30 +1,56 @@
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { Stack, useRouter } from "expo-router";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  View,
+  TextInput,
+  View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { supabase } from "@/lib/supabase";
 
 type Option = { label: string; value: string };
 
-export default function SettingsScreen() {
-  const router = useRouter();
+type User = {
+  id: string;
+  email: string;
+  display_name?: string;
+  phone?: string;
+  provider?: string;
+  provider_type?: string;
+  avatar_url?: string;
+};
 
-  const [darkMode, setDarkMode] = useState(false); // demo UI
+export default function SettingsScreen() {
+  const [darkMode, setDarkMode] = useState(false);
   const [biometric, setBiometric] = useState(false);
   const [pushNoti, setPushNoti] = useState(true);
   const [weeklyReport, setWeeklyReport] = useState(true);
 
   const [language, setLanguage] = useState<Option>({ label: "Tiếng Việt", value: "vi" });
   const [currency, setCurrency] = useState<Option>({ label: "VND (₫)", value: "VND" });
+
+  // Current user profile
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ display_name: '', phone: '' });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Export data states
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportType, setExportType] = useState<'income' | 'expense' | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const languages: Option[] = useMemo(
     () => [
@@ -70,6 +96,237 @@ export default function SettingsScreen() {
     ]);
   };
 
+  // Load current user profile
+  React.useEffect(() => {
+    loadCurrentUserProfile();
+  }, []);
+
+  const loadCurrentUserProfile = async () => {
+    setLoadingProfile(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        setCurrentUser({
+          id: user.id,
+          email: user.email || '',
+          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || '',
+          phone: user.phone || '',
+          provider: user.app_metadata?.provider || 'email',
+          provider_type: user.app_metadata?.providers?.[0] || 'Email',
+          avatar_url: user.user_metadata?.avatar_url || '',
+        });
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  };
+
+  // Edit current user profile
+  const editCurrentUserProfile = () => {
+    if (!currentUser) return;
+    
+    setProfileForm({
+      display_name: currentUser.display_name || '',
+      phone: currentUser.phone || '',
+    });
+    setShowEditProfileModal(true);
+  };
+
+  // Pick and upload avatar
+  const pickAvatar = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Lỗi', 'Cần quyền truy cập thư viện ảnh');
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      setUploadingAvatar(true);
+
+      // Get file info
+      const uri = result.assets[0].uri;
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${currentUser?.id}.${fileExt}`; // Đơn giản hóa tên file
+
+      // Convert to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Upload to Supabase Storage với upsert
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, blob, {
+          contentType: `image/${fileExt}`,
+          upsert: true, // Ghi đè nếu đã tồn tại
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        Alert.alert('Lỗi', 'Không thể tải ảnh lên: ' + uploadError.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // Cache busting
+
+      // Update user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: {
+          avatar_url: avatarUrl,
+        },
+      });
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        Alert.alert('Lỗi', 'Không thể cập nhật ảnh đại diện: ' + updateError.message);
+        return;
+      }
+
+      // Update local state
+      if (currentUser) {
+        setCurrentUser({ ...currentUser, avatar_url: avatarUrl });
+      }
+
+      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện');
+    } catch (error: any) {
+      console.error('Error picking avatar:', error);
+      Alert.alert('Lỗi', error.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // Save profile changes
+  const saveProfileChanges = async () => {
+    if (!currentUser) return;
+    
+    try {
+      // Update user metadata trực tiếp qua Supabase Auth
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          display_name: profileForm.display_name,
+          full_name: profileForm.display_name,
+        },
+        phone: profileForm.phone,
+      });
+      
+      if (error) {
+        console.error('Error updating profile:', error);
+        Alert.alert('Lỗi', 'Không thể cập nhật: ' + error.message);
+        return;
+      }
+      
+      // Update current user state
+      setCurrentUser({ 
+        ...currentUser, 
+        display_name: profileForm.display_name, 
+        phone: profileForm.phone 
+      });
+      
+      setShowEditProfileModal(false);
+      Alert.alert('Thành công', 'Đã cập nhật thông tin cá nhân');
+    } catch (err: any) {
+      console.error('Error:', err);
+      Alert.alert('Lỗi', 'Không thể cập nhật: ' + err.message);
+    }
+  };
+
+  // Export transactions to Excel
+  const exportTransactions = async () => {
+    if (!exportType) {
+      Alert.alert('Lỗi', 'Vui lòng chọn loại giao dịch');
+      return;
+    }
+
+    setExportLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+        return;
+      }
+
+      // Lấy dữ liệu transactions
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*, categories(name)')
+        .eq('user_id', user.id)
+        .eq('type', exportType)
+        .order('transaction_date', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching transactions:', error);
+        Alert.alert('Lỗi', 'Không thể lấy dữ liệu: ' + error.message);
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        Alert.alert('Thông báo', `Không có dữ liệu ${exportType === 'income' ? 'thu nhập' : 'chi tiêu'}`);
+        return;
+      }
+
+      // Create CSV content
+      const headers = 'Ngày,Danh mục,Số tiền,Ghi chú\n';
+      const rows = data.map((tx: any) => {
+        const date = new Date(tx.transaction_date).toLocaleDateString('vi-VN');
+        const category = tx.categories?.name || 'Không có';
+        const amount = tx.amount.toLocaleString('vi-VN');
+        const note = (tx.note || '').replace(/"/g, '""'); // Escape quotes
+        return `"${date}","${category}","${amount}","${note}"`;
+      }).join('\n');
+      
+      const csvContent = '\uFEFF' + headers + rows; // Add BOM for UTF-8
+      const fileName = `${exportType === 'income' ? 'thu_nhap' : 'chi_tieu'}_${new Date().getTime()}.csv`;
+
+      if (Platform.OS === 'web') {
+        // Trên web: Download file CSV
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', fileName);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } else {
+        // Trên mobile: Show preview
+        Alert.alert(
+          'Xuất dữ liệu',
+          `Đã xuất ${data.length} giao dịch`,
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Đóng modal và reset
+      setShowExportModal(false);
+      setExportType(null);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      Alert.alert('Lỗi', 'Không thể xuất file: ' + err.message);
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   return (
     <ThemedView style={styles.page}>
       <Stack.Screen options={{ title: "Cài đặt" }} />
@@ -77,16 +334,42 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Profile */}
         <ThemedView style={styles.profileCard}>
-          <ThemedView style={styles.avatar} />
+          <Pressable onPress={pickAvatar} style={styles.avatarContainer}>
+            {uploadingAvatar ? (
+              <View style={styles.avatar}>
+                <ActivityIndicator size="small" color="#3B82F6" />
+              </View>
+            ) : currentUser?.avatar_url ? (
+              <Image source={{ uri: currentUser.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <ThemedView style={styles.avatar}>
+                <ThemedText style={styles.avatarText}>
+                  {currentUser?.display_name?.charAt(0)?.toUpperCase() || 
+                   currentUser?.email?.charAt(0)?.toUpperCase() || '?'}
+                </ThemedText>
+              </ThemedView>
+            )}
+            <View style={styles.avatarBadge}>
+              <ThemedText style={styles.avatarBadgeText}>📷</ThemedText>
+            </View>
+          </Pressable>
+          
           <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle">Pham Huu Tien</ThemedText>
-            <ThemedText style={styles.muted}>
-              Tài khoản cá nhân • {Platform.OS.toUpperCase()}
+            <ThemedText type="subtitle">
+              {loadingProfile ? 'Đang tải...' : (currentUser?.display_name || currentUser?.email || 'Người dùng')}
             </ThemedText>
+            <ThemedText style={styles.muted}>
+              {currentUser?.email || 'Chưa có email'} • {Platform.OS.toUpperCase()}
+            </ThemedText>
+            {currentUser?.phone && (
+              <ThemedText style={styles.muted}>
+                📱 {currentUser.phone}
+              </ThemedText>
+            )}
           </View>
 
           <Pressable
-            onPress={() => Alert.alert("Info", "Bạn có thể mở trang Profile ở đây.")}
+            onPress={editCurrentUserProfile}
             style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.75 }]}
           >
             <ThemedText style={styles.outlineBtnText}>Sửa</ThemedText>
@@ -141,8 +424,8 @@ export default function SettingsScreen() {
         <Section title="Dữ liệu">
           <RowPress
             title="Sao lưu dữ liệu"
-            subtitle="Xuất dữ liệu ra file"
-            onPress={() => Alert.alert("Backup", "Export CSV/JSON ở đây.")}
+            subtitle="Xuất dữ liệu ra file Excel"
+            onPress={() => setShowExportModal(true)}
           />
           <RowPress
             title="Khôi phục dữ liệu"
@@ -180,7 +463,6 @@ export default function SettingsScreen() {
             onPress={() =>
               confirmDanger("Đăng xuất", "Bạn muốn đăng xuất?", () => {
                 Alert.alert("Đăng xuất", "Đã đăng xuất (demo).");
-                // router.replace("/auth/login");
               })
             }
           />
@@ -188,6 +470,157 @@ export default function SettingsScreen() {
 
         <ThemedText style={styles.footer}>© {new Date().getFullYear()} Finly</ThemedText>
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      {showEditProfileModal && (
+        <Modal
+          visible={showEditProfileModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowEditProfileModal(false)}
+        >
+          <Pressable 
+            style={styles.editModalOverlay}
+            onPress={() => setShowEditProfileModal(false)}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <ThemedView style={styles.editModalContent}>
+                <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
+                  Chỉnh sửa thông tin cá nhân
+                </ThemedText>
+
+                <ThemedText style={styles.label}>Email</ThemedText>
+                <TextInput
+                  style={[styles.input, styles.inputDisabled]}
+                  value={currentUser?.email || ''}
+                  editable={false}
+                  placeholder="Email"
+                  placeholderTextColor="rgba(127,127,127,0.5)"
+                />
+                <ThemedText style={styles.helperText}>Email không thể thay đổi</ThemedText>
+
+                <ThemedText style={styles.label}>Tên hiển thị</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  value={profileForm.display_name}
+                  onChangeText={(text) => setProfileForm({ ...profileForm, display_name: text })}
+                  placeholder="Nhập tên hiển thị"
+                  placeholderTextColor="rgba(127,127,127,0.5)"
+                />
+
+                <ThemedText style={styles.label}>Số điện thoại</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  value={profileForm.phone}
+                  onChangeText={(text) => setProfileForm({ ...profileForm, phone: text })}
+                  placeholder="Nhập số điện thoại"
+                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  keyboardType="phone-pad"
+                />
+
+                <View style={styles.editModalActions}>
+                  <Pressable
+                    onPress={() => setShowEditProfileModal(false)}
+                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={saveProfileChanges}
+                    style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={styles.saveBtnText}>Lưu</ThemedText>
+                  </Pressable>
+                </View>
+              </ThemedView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* Export Data Modal */}
+      {showExportModal && (
+        <Modal
+          visible={showExportModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowExportModal(false)}
+        >
+          <Pressable 
+            style={styles.editModalOverlay}
+            onPress={() => setShowExportModal(false)}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <ThemedView style={styles.editModalContent}>
+                <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
+                  Xuất dữ liệu
+                </ThemedText>
+
+                <ThemedText style={styles.label}>Chọn loại giao dịch</ThemedText>
+                
+                <Pressable
+                  onPress={() => setExportType('income')}
+                  style={[
+                    styles.optionBtn,
+                    exportType === 'income' && styles.optionBtnSelected
+                  ]}
+                >
+                  <View style={styles.radioOuter}>
+                    {exportType === 'income' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.optionTitle}>Thu nhập</ThemedText>
+                    <ThemedText style={styles.optionSubtitle}>Xuất tất cả giao dịch thu nhập</ThemedText>
+                  </View>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => setExportType('expense')}
+                  style={[
+                    styles.optionBtn,
+                    exportType === 'expense' && styles.optionBtnSelected
+                  ]}
+                >
+                  <View style={styles.radioOuter}>
+                    {exportType === 'expense' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <ThemedText style={styles.optionTitle}>Chi tiêu</ThemedText>
+                    <ThemedText style={styles.optionSubtitle}>Xuất tất cả giao dịch chi tiêu</ThemedText>
+                  </View>
+                </Pressable>
+
+                <View style={styles.editModalActions}>
+                  <Pressable
+                    onPress={() => {
+                      setShowExportModal(false);
+                      setExportType(null);
+                    }}
+                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={exportTransactions}
+                    disabled={!exportType || exportLoading}
+                    style={({ pressed }) => [
+                      styles.saveBtn,
+                      (!exportType || exportLoading) && styles.saveBtnDisabled,
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    {exportLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <ThemedText style={styles.saveBtnText}>Xuất Excel</ThemedText>
+                    )}
+                  </Pressable>
+                </View>
+              </ThemedView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
     </ThemedView>
   );
 }
@@ -296,11 +729,42 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "rgba(127,127,127,0.25)",
   },
+  avatarContainer: {
+    position: 'relative',
+  },
   avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "rgba(127,127,127,0.15)",
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: '700',
+    opacity: 0.6,
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  avatarBadgeText: {
+    fontSize: 12,
   },
 
   outlineBtn: {
@@ -341,4 +805,138 @@ const styles = StyleSheet.create({
   chev: { fontSize: 22, marginLeft: 6, marginTop: -2, opacity: 0.6 },
 
   footer: { textAlign: "center", marginTop: 6, fontSize: 12, opacity: 0.6 },
+
+  // Edit modal
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  editModalContent: {
+    width: '100%',
+    maxWidth: 440,
+    padding: 24,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: '700',
+    marginBottom: 8,
+    marginTop: 16,
+    opacity: 0.8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  input: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(127,127,127,0.25)',
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    backgroundColor: 'rgba(127,127,127,0.03)',
+    color: '#000',
+  },
+  inputDisabled: {
+    backgroundColor: 'rgba(127,127,127,0.12)',
+    color: 'rgba(0,0,0,0.4)',
+    borderColor: 'rgba(127,127,127,0.15)',
+  },
+  helperText: {
+    fontSize: 11,
+    opacity: 0.5,
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  editModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 28,
+  },
+  cancelBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: 'rgba(127,127,127,0.15)',
+    alignItems: 'center',
+  },
+  cancelBtnText: { 
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  saveBtn: {
+    flex: 1,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  saveBtnText: { 
+    color: '#fff', 
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  saveBtnDisabled: {
+    backgroundColor: 'rgba(59,130,246,0.4)',
+    shadowOpacity: 0,
+  },
+
+  // Export modal
+  optionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(127,127,127,0.15)',
+    marginBottom: 12,
+    gap: 14,
+    backgroundColor: 'rgba(127,127,127,0.02)',
+  },
+  optionBtnSelected: {
+    borderColor: '#3B82F6',
+    backgroundColor: 'rgba(59,130,246,0.08)',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  radioOuter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: 'rgba(127,127,127,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  radioInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#3B82F6',
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  optionSubtitle: {
+    fontSize: 13,
+    opacity: 0.65,
+    marginTop: 2,
+  },
 });
