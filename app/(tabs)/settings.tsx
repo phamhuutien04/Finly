@@ -1,6 +1,9 @@
+import { saveToDownloads } from '@/lib/DownloadModule';
+import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack } from "expo-router";
+import * as Sharing from 'expo-sharing';
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -307,13 +310,36 @@ export default function SettingsScreen() {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        
+        Alert.alert('Thành công', `Đã tải xuống ${data.length} giao dịch`);
+      } else if (Platform.OS === 'android') {
+        // Trên Android: Lưu trực tiếp vào Downloads
+        try {
+          await saveToDownloads(fileName, csvContent);
+          
+          Alert.alert(
+            'Thành công', 
+            `Đã lưu ${data.length} giao dịch vào thư mục Downloads\n\nTên file: ${fileName}`
+          );
+        } catch (fileError: any) {
+          console.error('File save error:', fileError);
+          Alert.alert('Lỗi', 'Không thể lưu file: ' + fileError.message);
+        }
       } else {
-        // Trên mobile: Show preview
-        Alert.alert(
-          'Xuất dữ liệu',
-          `Đã xuất ${data.length} giao dịch`,
-          [{ text: 'OK' }]
-        );
+        // Trên iOS: Chia sẻ file
+        try {
+          const file = new File(Paths.document, fileName);
+          await file.write(csvContent);
+          
+          await Sharing.shareAsync(file.uri, {
+            mimeType: 'text/csv',
+            dialogTitle: 'Lưu file vào điện thoại',
+            UTI: 'public.comma-separated-values-text',
+          });
+        } catch (fileError: any) {
+          console.error('File save error:', fileError);
+          Alert.alert('Lỗi', 'Không thể tạo file: ' + fileError.message);
+        }
       }
 
       // Đóng modal và reset
@@ -612,7 +638,7 @@ export default function SettingsScreen() {
                     {exportLoading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <ThemedText style={styles.saveBtnText}>Xuất Excel</ThemedText>
+                      <ThemedText style={styles.saveBtnText}>📥 Tải xuống</ThemedText>
                     )}
                   </Pressable>
                 </View>
