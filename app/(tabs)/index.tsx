@@ -8,11 +8,11 @@ import {
     Pressable,
     RefreshControl,
     StyleSheet,
+    Text,
     View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
 import { setGlobalAlertFunction } from "@/lib/budgetNotification";
 import { supabase } from "@/lib/supabase";
@@ -203,14 +203,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
-      {/* Gradient Background Overlay */}
-      <View style={styles.gradientOverlay} />
-      
-      {/* Decorative Elements */}
-      <View style={styles.decorCircle1} />
-      <View style={styles.decorCircle2} />
-
+    <View style={[styles.screen, { backgroundColor: '#fafafa' }]}>
       <FlatList
         data={txs}
         keyExtractor={(item) => item.id}
@@ -246,11 +239,11 @@ export default function HomeScreen() {
 
             {/* Hero Balance Card */}
             <View style={styles.heroCard}>
-              <View style={styles.heroGradient} />
-              
               <View style={styles.heroContent}>
                 <ThemedText style={styles.heroLabel}>Tổng tài sản</ThemedText>
-                <ThemedText style={styles.heroAmount}>{formatVND(balance)}</ThemedText>
+                <View style={styles.amountContainer}>
+                  <Text style={styles.heroAmount}>{formatVND(balance)}</Text>
+                </View>
                 
                 <View style={styles.statsRow}>
                   <View style={styles.statItem}>
@@ -276,17 +269,10 @@ export default function HomeScreen() {
                   </View>
                 </View>
               </View>
-
-              {/* Decorative Pattern */}
-              <View style={styles.patternContainer}>
-                <View style={styles.patternDot} />
-                <View style={[styles.patternDot, { top: 20, left: 15 }]} />
-                <View style={[styles.patternDot, { top: 10, left: 30 }]} />
-              </View>
             </View>
 
-            {/* Budget Alerts */}
-            {BudgetAlerts && <BudgetAlerts />}
+            {/* Budget Alerts - Tạm thời tắt để test */}
+            {/* {BudgetAlerts && <BudgetAlerts />} */}
 
             {/* Quick Actions */}
             <View style={styles.quickActions}>
@@ -364,7 +350,7 @@ export default function HomeScreen() {
       
       {/* Custom Budget Alert */}
       {AlertComponent && <AlertComponent />}
-    </ThemedView>
+    </View>
   );
 }
 
@@ -467,40 +453,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafafa',
   },
   
-  // Decorative elements
-  gradientOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 400,
-    backgroundColor: '#6366f1',
-    opacity: 0.02,
-    zIndex: -2,
-  },
-  decorCircle1: {
-    position: 'absolute',
-    top: -80,
-    right: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#818cf8',
-    opacity: 0.04,
-    zIndex: -1,
-  },
-  decorCircle2: {
-    position: 'absolute',
-    top: 120,
-    left: -40,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#c084fc',
-    opacity: 0.03,
-    zIndex: -1,
-  },
-  
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 16,
@@ -550,32 +502,33 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: '#ffffff',
     borderRadius: 28,
-    padding: 28,
+    padding: 20,
     marginBottom: 24,
-    overflow: 'hidden',
+    marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 24,
     elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.04)',
-  },
-  heroGradient: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 200,
-    height: 200,
-    backgroundColor: '#6366f1',
-    opacity: 0.03,
-    borderRadius: 100,
-    transform: [{ translateX: 60 }, { translateY: -60 }],
-    zIndex: 0,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+    width: '100%',
+    alignSelf: 'stretch',
   },
   heroContent: {
-    zIndex: 20,
     position: 'relative',
+  },
+  amountContainer: {
+    backgroundColor: '#ffffff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
+    width: '100%',
+    minHeight: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   heroLabel: {
     fontSize: 14,
@@ -586,13 +539,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroAmount: {
-    fontSize: 38,
+    fontSize: 32,
     fontWeight: '900',
-    color: '#0f172a',
-    letterSpacing: -1.5,
-    marginBottom: 24,
-    zIndex: 30,
-    position: 'relative',
+    color: '#000000',
+    letterSpacing: -1,
+    textAlign: 'center',
+    backgroundColor: 'transparent',
+    width: '100%',
+    flexShrink: 1,
+    lineHeight: 40,
+    paddingVertical: 8,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   statsRow: {
     flexDirection: 'row',
@@ -624,31 +582,15 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#0f172a',
+    color: '#000000',
     letterSpacing: -0.5,
+    backgroundColor: 'transparent',
   },
   statDivider: {
     width: 1,
     height: 40,
     backgroundColor: '#e2e8f0',
     marginHorizontal: 12,
-  },
-  
-  // Decorative pattern
-  patternContainer: {
-    position: 'absolute',
-    top: 24,
-    right: 24,
-    opacity: 0.15,
-    zIndex: 1,
-  },
-  patternDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#6366f1',
-    opacity: 0.2,
   },
 
   // Quick Actions
