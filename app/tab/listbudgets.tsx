@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -5,6 +7,7 @@ import {
   Alert,
   FlatList,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,10 +15,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { supabase } from '@/lib/supabase';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -32,7 +32,7 @@ type Budget = {
   period: string;
   start_date: string | null;
   end_date: string | null;
-  category?: { name: string | null } | null;
+  category?: { name: string | null } | { name: string | null }[] | null;
 };
 
 export default function BudgetListScreen() {
@@ -243,12 +243,17 @@ export default function BudgetListScreen() {
   const renderBudgetItem = ({ item }: { item: Budget }) => {
     const start = item.start_date ? new Date(item.start_date).toLocaleDateString('vi-VN') : 'N/A';
     const end = item.end_date ? new Date(item.end_date).toLocaleDateString('vi-VN') : 'N/A';
+    
+    // Xử lý category có thể là object hoặc array
+    const categoryName = Array.isArray(item.category) 
+      ? item.category[0]?.name || 'Không có hạng mục'
+      : item.category?.name || 'Không có hạng mục';
 
     return (
       <ThemedView style={styles.card}>
         <View style={styles.cardContent}>
           <ThemedText style={styles.category}>
-            {item.category?.name || 'Không có hạng mục'}
+            {categoryName}
           </ThemedText>
           <ThemedText style={styles.amount}>
             Giới hạn: {new Intl.NumberFormat('vi-VN').format(item.amount)} ₫
@@ -283,7 +288,7 @@ export default function BudgetListScreen() {
 
       <Pressable
         style={styles.addNewButton}
-        onPress={() => router.push('/budget/new')}
+        onPress={() => router.push('/tab/explore')}
       >
         <Text style={styles.addNewText}>+ Tạo ngân sách mới</Text>
       </Pressable>
@@ -381,7 +386,7 @@ export default function BudgetListScreen() {
                   value={startDate}
                   mode="date"
                   display="default"
-                  onChange={(_, date) => {
+                  onChange={(_event: any, date?: Date) => {
                     setShowStartPicker(Platform.OS === 'ios');
                     if (date) setStartDate(date);
                   }}
@@ -398,7 +403,7 @@ export default function BudgetListScreen() {
                   value={endDate}
                   mode="date"
                   display="default"
-                  onChange={(_, date) => {
+                  onChange={(_event: any, date?: Date) => {
                     setShowEndPicker(Platform.OS === 'ios');
                     if (date) setEndDate(date);
                   }}

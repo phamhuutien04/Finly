@@ -1,22 +1,28 @@
+import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
-  ActivityIndicator,
-  ScrollView,
-  Image,
 } from "react-native";
-import { Stack, useRouter } from "expo-router";
 
-import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { supabase } from "@/lib/supabase";
+
+// Chỉ import DateTimePicker khi không phải web
+let DateTimePicker: any = null;
+if (Platform.OS !== "web") {
+  DateTimePicker = require("@react-native-community/datetimepicker").default;
+}
 
 type TxType = "income" | "expense";
 
@@ -45,6 +51,8 @@ export default function ModalAddTransactionNoAccount() {
 
   const [amountText, setAmountText] = useState<string>("");
   const [note, setNote] = useState<string>("");
+  const [transactionDate, setTransactionDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
 
   const amountNumber = useMemo(() => {
     const cleaned = amountText.replace(/[^\d]/g, "");
@@ -170,7 +178,7 @@ export default function ModalAddTransactionNoAccount() {
         category_id: categoryId,
         amount: amountNumber,
         type,
-        transaction_date: new Date().toISOString(),
+        transaction_date: transactionDate.toISOString(),
         note: note.trim() || null,
       });
 
@@ -265,6 +273,94 @@ export default function ModalAddTransactionNoAccount() {
               />
             </View>
 
+            {/* Transaction Date */}
+            <ThemedText style={[styles.label, { marginTop: 14 }]}>Ngày giao dịch</ThemedText>
+            <Pressable onPress={() => setShowDatePicker(true)} style={styles.inputWrap}>
+              <ThemedText style={{ fontSize: 15 }}>
+                {transactionDate.toLocaleDateString("vi-VN", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </ThemedText>
+            </Pressable>
+
+            {/* Date Picker for Mobile */}
+            {Platform.OS !== "web" && showDatePicker && (
+              <View>
+                <DateTimePicker
+                  value={transactionDate}
+                  mode="datetime"
+                  display={Platform.OS === "ios" ? "spinner" : "default"}
+                  onChange={(event :any, selectedDate : any) => {
+                    if (Platform.OS === "android") {
+                      setShowDatePicker(false);
+                    }
+                    if (selectedDate) {
+                      setTransactionDate(selectedDate);
+                    }
+                  }}
+                />
+                {Platform.OS === "ios" && (
+                  <Pressable
+                    onPress={() => setShowDatePicker(false)}
+                    style={[styles.btn, { marginTop: 8, backgroundColor: "#007AFF" }]}
+                  >
+                    <ThemedText style={styles.btnText}>Xong</ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            )}
+
+            {/* Date Picker for Web */}
+            {Platform.OS === "web" && showDatePicker && (
+              <View style={styles.webDatePicker}>
+                <View style={styles.webDatePickerContent}>
+                  <ThemedText style={[styles.label, { marginBottom: 12 }]}>Chọn ngày và giờ</ThemedText>
+                  
+                  <input
+                    type="datetime-local"
+                    value={transactionDate.toISOString().slice(0, 16)}
+                    onChange={(e: any) => {
+                      const newDate = new Date(e.target.value);
+                      if (!isNaN(newDate.getTime())) {
+                        setTransactionDate(newDate);
+                      }
+                    }}
+                    style={{
+                      fontSize: 15,
+                      borderRadius: 14,
+                      paddingLeft: 12,
+                      paddingRight: 12,
+                      paddingTop: 12,
+                      paddingBottom: 12,
+                      borderWidth: 0.5,
+                      borderColor: "rgba(127,127,127,0.25)",
+                      marginBottom: 12,
+                      width: "100%",
+                    }}
+                  />
+
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <Pressable
+                      onPress={() => setShowDatePicker(false)}
+                      style={[styles.btn, { flex: 1, backgroundColor: "#007AFF" }]}
+                    >
+                      <ThemedText style={styles.btnText}>Xác nhận</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setShowDatePicker(false)}
+                      style={[styles.btnGhost, { flex: 1 }]}
+                    >
+                      <ThemedText style={styles.btnGhostText}>Hủy</ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {/* Note */}
             <ThemedText style={[styles.label, { marginTop: 14 }]}>Ghi chú</ThemedText>
             <View style={styles.inputWrap}>
@@ -357,4 +453,23 @@ const styles = StyleSheet.create({
     borderColor: "rgba(127,127,127,0.25)",
   },
   btnGhostText: { fontWeight: "900", opacity: 0.9 },
+
+  webDatePicker: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  webDatePickerContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+  },
 });

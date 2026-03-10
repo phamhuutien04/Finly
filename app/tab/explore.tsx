@@ -1,20 +1,20 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import React, { useState, useEffect } from 'react';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { supabase } from '@/lib/supabase';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Platform,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { supabase } from '@/lib/supabase';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 
 type Category = {
   id: number;
@@ -222,11 +222,14 @@ export default function BudgetFormScreen() {
       return Alert.alert('Lỗi', 'Vui lòng đăng nhập');
     }
 
+    // Chuyển đổi period: nếu là 'daily' thì lưu là 'custom' vào database
+    const dbPeriod = period === 'daily' ? 'custom' : period;
+
     const payload = {
       user_id: session.user.id,
       category_id: selectedCategoryId,
       amount: Number(amount),
-      period,
+      period: dbPeriod,
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
     };
@@ -359,7 +362,7 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('weekly')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'weekly' && styles.periodBtnTextActive]}>📆</Text>
+              <Text style={[styles.periodBtnIcon, period === 'weekly' && styles.periodBtnTextActive]}>�</Text>
               <Text style={[styles.periodBtnText, period === 'weekly' && styles.periodBtnTextActive]}>
                 Tuần
               </Text>
@@ -372,7 +375,7 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('monthly')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'monthly' && styles.periodBtnTextActive]}>📅</Text>
+              <Text style={[styles.periodBtnIcon, period === 'monthly' && styles.periodBtnTextActive]}>�</Text>
               <Text style={[styles.periodBtnText, period === 'monthly' && styles.periodBtnTextActive]}>
                 Tháng
               </Text>
@@ -472,7 +475,7 @@ export default function BudgetFormScreen() {
               value={startDate}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onChange={(_event: any, date?: Date) => {
                 setShowStartPicker(Platform.OS === 'ios');
                 if (date) {
                   setStartDate(date);
@@ -488,7 +491,7 @@ export default function BudgetFormScreen() {
               value={endDate}
               mode="date"
               display="default"
-              onChange={(_, date) => {
+              onChange={(_event: any, date?: Date) => {
                 setShowEndPicker(Platform.OS === 'ios');
                 if (date) {
                   setEndDate(date);
