@@ -22,6 +22,15 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { supabase } from "@/lib/supabase";
 
+// Import NotificationTest conditionally
+let NotificationTest: any = null;
+try {
+  NotificationTest = require("@/components/NotificationTest").default;
+} catch (error) {
+  console.log('NotificationTest component not available');
+  NotificationTest = () => null;
+}
+
 type Option = { label: string; value: string };
 
 type User = {
@@ -446,6 +455,13 @@ export default function SettingsScreen() {
             onPress={() => Alert.alert("PIN", "Gắn màn hình đổi PIN vào đây.")}
           />
         </Section>
+
+        {/* Test Notification - chỉ hiển thị trên mobile */}
+        {Platform.OS !== 'web' && NotificationTest && (
+          <Section title="Test thông báo">
+            <NotificationTest />
+          </Section>
+        )}
 
         <Section title="Dữ liệu">
           <RowPress

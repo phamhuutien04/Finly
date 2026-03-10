@@ -1,5 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -16,6 +15,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// Chỉ import DateTimePicker khi không phải web
+let DateTimePicker: any = null;
+if (Platform.OS !== "web") {
+  DateTimePicker = require("@react-native-community/datetimepicker").default;
+}
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -381,34 +385,95 @@ export default function BudgetListScreen() {
                 <Text>{startDate.toLocaleDateString('vi-VN')}</Text>
               </TouchableOpacity>
 
-              {showStartPicker && (
-                <DateTimePicker
-                  value={startDate}
-                  mode="date"
-                  display="default"
-                  onChange={(_event: any, date?: Date) => {
-                    setShowStartPicker(Platform.OS === 'ios');
-                    if (date) setStartDate(date);
+          {/* Date Pickers - chỉ hiển thị trên mobile */}
+          {Platform.OS !== 'web' && showStartPicker && DateTimePicker && (
+            <DateTimePicker
+              value={startDate}
+              mode="date"
+              display="default"
+              onChange={(_event: any, date?: Date) => {
+                setShowStartPicker(Platform.OS === 'ios');
+                if (date) setStartDate(date);
+              }}
+            />
+          )}
+
+          {Platform.OS !== 'web' && showEndPicker && DateTimePicker && (
+            <DateTimePicker
+              value={endDate}
+              mode="date"
+              display="default"
+              onChange={(_event: any, date?: Date) => {
+                setShowEndPicker(Platform.OS === 'ios');
+                if (date) setEndDate(date);
+              }}
+            />
+          )}
+
+          {/* Web Date Pickers */}
+          {Platform.OS === 'web' && showStartPicker && (
+            <View style={styles.webDatePicker}>
+              <View style={styles.webDatePickerContent}>
+                <Text style={styles.modalLabel}>Chọn ngày bắt đầu</Text>
+                <input
+                  type="date"
+                  value={startDate.toISOString().split('T')[0]}
+                  onChange={(e: any) => {
+                    const newDate = new Date(e.target.value);
+                    if (!isNaN(newDate.getTime())) {
+                      setStartDate(newDate);
+                    }
+                  }}
+                  style={{
+                    padding: 12,
+                    borderRadius: 8,
+                    border: '1px solid #ddd',
+                    fontSize: 16,
+                    width: '100%',
+                    marginBottom: 12,
                   }}
                 />
-              )}
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#3b82f6' }]}
+                  onPress={() => setShowStartPicker(false)}
+                >
+                  <Text style={{ color: '#fff' }}>Xong</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
-              <Text style={styles.modalLabel}>Đến ngày</Text>
-              <TouchableOpacity style={styles.modalDateBtn} onPress={() => setShowEndPicker(true)}>
-                <Text>{endDate.toLocaleDateString('vi-VN')}</Text>
-              </TouchableOpacity>
-
-              {showEndPicker && (
-                <DateTimePicker
-                  value={endDate}
-                  mode="date"
-                  display="default"
-                  onChange={(_event: any, date?: Date) => {
-                    setShowEndPicker(Platform.OS === 'ios');
-                    if (date) setEndDate(date);
+          {Platform.OS === 'web' && showEndPicker && (
+            <View style={styles.webDatePicker}>
+              <View style={styles.webDatePickerContent}>
+                <Text style={styles.modalLabel}>Chọn ngày kết thúc</Text>
+                <input
+                  type="date"
+                  value={endDate.toISOString().split('T')[0]}
+                  onChange={(e: any) => {
+                    const newDate = new Date(e.target.value);
+                    if (!isNaN(newDate.getTime())) {
+                      setEndDate(newDate);
+                    }
+                  }}
+                  style={{
+                    padding: 12,
+                    borderRadius: 8,
+                    border: '1px solid #ddd',
+                    fontSize: 16,
+                    width: '100%',
+                    marginBottom: 12,
                   }}
                 />
-              )}
+                <TouchableOpacity
+                  style={[styles.modalBtn, { backgroundColor: '#3b82f6' }]}
+                  onPress={() => setShowEndPicker(false)}
+                >
+                  <Text style={{ color: '#fff' }}>Xong</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
             </ScrollView>
 
             <View style={styles.modalActions}>
@@ -582,5 +647,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // Web date picker styles
+  webDatePicker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  webDatePickerContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
   },
 });

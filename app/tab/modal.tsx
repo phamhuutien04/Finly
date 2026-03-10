@@ -7,16 +7,39 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { supabase } from "@/lib/supabase";
+
+// Import notification functions conditionally
+let requestNotificationPermissions: any = null;
+let checkBudgetAfterTransaction: any = null;
+
+try {
+  const notifications = require("@/lib/budgetNotification");
+  requestNotificationPermissions = notifications.requestNotificationPermissions;
+  checkBudgetAfterTransaction = notifications.checkBudgetAfterTransaction;
+} catch (error) {
+  // Fallback functions if import fails
+  requestNotificationPermissions = async () => {
+    if (Platform.OS === 'web' && 'Notification' in window) {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
+    }
+    return false;
+  };
+  
+  checkBudgetAfterTransaction = async () => {
+    console.log('Budget check not available');
+  };
+}
 
 // Chỉ import DateTimePicker khi không phải web
 let DateTimePicker: any = null;
@@ -123,6 +146,12 @@ export default function ModalAddTransactionNoAccount() {
           return;
         }
 
+        // Yêu cầu quyền thông báo (không cần lên lịch)
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+          console.log('✅ Đã có quyền thông báo, sẵn sàng gửi cảnh báo ngân sách');
+        }
+
         const cats = await fetchCategories();
 
         if (!mounted) return;
@@ -183,6 +212,21 @@ export default function ModalAddTransactionNoAccount() {
       });
 
       if (insErr) throw insErr;
+
+      // Kiểm tra ngân sách nếu là giao dịch chi tiêu
+      if (type === "expense" && checkBudgetAfterTransaction) {
+        try {
+          await checkBudgetAfterTransaction(
+            user.id,
+            Number(categoryId),
+            amountNumber,
+            transactionDate.toISOString().split('T')[0]
+          );
+        } catch (budgetError) {
+          console.log('Lỗi kiểm tra ngân sách:', budgetError);
+          // Không hiển thị lỗi cho user vì đây chỉ là tính năng phụ
+        }
+      }
 
       Alert.alert("Thành công", "Đã thêm giao dịch!");
       router.back();
@@ -294,7 +338,7 @@ export default function ModalAddTransactionNoAccount() {
                   value={transactionDate}
                   mode="datetime"
                   display={Platform.OS === "ios" ? "spinner" : "default"}
-                  onChange={(event :any, selectedDate : any) => {
+                  onChange={(_event :any, selectedDate : any) => {
                     if (Platform.OS === "android") {
                       setShowDatePicker(false);
                     }

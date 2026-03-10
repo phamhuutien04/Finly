@@ -1,7 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -15,6 +14,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+
+// Chỉ import DateTimePicker khi không phải web
+let DateTimePicker: any = null;
+if (Platform.OS !== "web") {
+  DateTimePicker = require("@react-native-community/datetimepicker").default;
+}
 
 type Category = {
   id: number;
@@ -470,7 +475,7 @@ export default function BudgetFormScreen() {
           </View>
 
           {/* Date Pickers */}
-          {showStartPicker && (
+          {Platform.OS !== 'web' && showStartPicker && DateTimePicker && (
             <DateTimePicker
               value={startDate}
               mode="date"
@@ -486,7 +491,7 @@ export default function BudgetFormScreen() {
             />
           )}
 
-          {showEndPicker && (
+          {Platform.OS !== 'web' && showEndPicker && DateTimePicker && (
             <DateTimePicker
               value={endDate}
               mode="date"
@@ -500,6 +505,103 @@ export default function BudgetFormScreen() {
                 }
               }}
             />
+          )}
+
+          {/* Web Date Pickers */}
+          {Platform.OS === 'web' && showStartPicker && (
+            <View style={styles.webDatePicker}>
+              <View style={styles.webDatePickerContent}>
+                <ThemedText style={[styles.sectionTitle, { marginBottom: 12 }]}>Chọn ngày bắt đầu</ThemedText>
+                
+                <input
+                  type="date"
+                  value={startDate.toISOString().split('T')[0]}
+                  onChange={(e: any) => {
+                    const newDate = new Date(e.target.value);
+                    if (!isNaN(newDate.getTime())) {
+                      setStartDate(newDate);
+                      setPeriod('custom');
+                      setPresetOption('custom');
+                    }
+                  }}
+                  style={{
+                    fontSize: 15,
+                    borderRadius: 14,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    paddingTop: 12,
+                    paddingBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#E0E0E0',
+                    marginBottom: 12,
+                    width: '100%',
+                  }}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowStartPicker(false)}
+                    style={[styles.saveButton, { flex: 1, backgroundColor: '#ef4444' }]}
+                  >
+                    <Text style={styles.saveButtonText}>Xác nhận</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowStartPicker(false)}
+                    style={[styles.cancelButton, { flex: 1 }]}
+                  >
+                    <Text style={styles.cancelButtonText}>Hủy</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {Platform.OS === 'web' && showEndPicker && (
+            <View style={styles.webDatePicker}>
+              <View style={styles.webDatePickerContent}>
+                <ThemedText style={[styles.sectionTitle, { marginBottom: 12 }]}>Chọn ngày kết thúc</ThemedText>
+                
+                <input
+                  type="date"
+                  value={endDate.toISOString().split('T')[0]}
+                  onChange={(e: any) => {
+                    const newDate = new Date(e.target.value);
+                    if (!isNaN(newDate.getTime())) {
+                      setEndDate(newDate);
+                      setPeriod('custom');
+                      setPresetOption('custom');
+                    }
+                  }}
+                  style={{
+                    fontSize: 15,
+                    borderRadius: 14,
+                    paddingLeft: 12,
+                    paddingRight: 12,
+                    paddingTop: 12,
+                    paddingBottom: 12,
+                    borderWidth: 1,
+                    borderColor: '#E0E0E0',
+                    marginBottom: 12,
+                    width: '100%',
+                  }}
+                />
+
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    onPress={() => setShowEndPicker(false)}
+                    style={[styles.saveButton, { flex: 1, backgroundColor: '#ef4444' }]}
+                  >
+                    <Text style={styles.saveButtonText}>Xác nhận</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowEndPicker(false)}
+                    style={[styles.cancelButton, { flex: 1 }]}
+                  >
+                    <Text style={styles.cancelButtonText}>Hủy</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
           )}
         </View>
 
@@ -828,5 +930,40 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  cancelButton: {
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFF',
+  },
+  
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Web date picker styles
+  webDatePicker: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  webDatePickerContent: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
   },
 });

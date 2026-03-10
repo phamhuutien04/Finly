@@ -1,20 +1,30 @@
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  Alert,
-  RefreshControl,
-  Image,
-  Animated,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View
 } from "react-native";
 
-import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useBudgetAlert } from "@/hooks/useBudgetAlert";
+import { setGlobalAlertFunction } from "@/lib/budgetNotification";
+import { supabase } from "@/lib/supabase";
+
+// Import BudgetAlerts conditionally
+let BudgetAlerts: any = null;
+try {
+  BudgetAlerts = require("@/components/BudgetAlerts").default;
+} catch (error) {
+  console.log('BudgetAlerts component not available');
+  BudgetAlerts = () => null; // Fallback component
+}
 
 type TxType = "income" | "expense";
 
@@ -78,6 +88,7 @@ function formatTimeLabel(iso: string) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { showAlert, AlertComponent } = useBudgetAlert();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -87,6 +98,13 @@ export default function HomeScreen() {
   const [expense, setExpense] = useState(0);
 
   const monthLabel = useMemo(() => getMonthLabel(), []);
+
+  // Set global alert function
+  useEffect(() => {
+    if (setGlobalAlertFunction && showAlert) {
+      setGlobalAlertFunction(showAlert);
+    }
+  }, [showAlert]);
 
   const getUserId = async () => {
     const { data } = await supabase.auth.getSession();
@@ -267,6 +285,9 @@ export default function HomeScreen() {
               </View>
             </View>
 
+            {/* Budget Alerts */}
+            {BudgetAlerts && <BudgetAlerts />}
+
             {/* Quick Actions */}
             <View style={styles.quickActions}>
               <QuickAction 
@@ -340,6 +361,9 @@ export default function HomeScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
+      
+      {/* Custom Budget Alert */}
+      {AlertComponent && <AlertComponent />}
     </ThemedView>
   );
 }
@@ -451,7 +475,8 @@ const styles = StyleSheet.create({
     right: 0,
     height: 400,
     backgroundColor: '#6366f1',
-    opacity: 0.03,
+    opacity: 0.02,
+    zIndex: -2,
   },
   decorCircle1: {
     position: 'absolute',
@@ -461,7 +486,8 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     backgroundColor: '#818cf8',
-    opacity: 0.08,
+    opacity: 0.04,
+    zIndex: -1,
   },
   decorCircle2: {
     position: 'absolute',
@@ -471,7 +497,8 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     backgroundColor: '#c084fc',
-    opacity: 0.06,
+    opacity: 0.03,
+    zIndex: -1,
   },
   
   scrollContent: {
@@ -541,12 +568,14 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     backgroundColor: '#6366f1',
-    opacity: 0.05,
+    opacity: 0.03,
     borderRadius: 100,
     transform: [{ translateX: 60 }, { translateY: -60 }],
+    zIndex: 0,
   },
   heroContent: {
-    zIndex: 1,
+    zIndex: 20,
+    position: 'relative',
   },
   heroLabel: {
     fontSize: 14,
@@ -557,11 +586,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroAmount: {
-    fontSize: 42,
+    fontSize: 38,
     fontWeight: '900',
     color: '#0f172a',
-    letterSpacing: -2,
+    letterSpacing: -1.5,
     marginBottom: 24,
+    zIndex: 30,
+    position: 'relative',
   },
   statsRow: {
     flexDirection: 'row',
@@ -608,7 +639,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 24,
     right: 24,
-    opacity: 0.4,
+    opacity: 0.15,
+    zIndex: 1,
   },
   patternDot: {
     position: 'absolute',
