@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Dimensions,
     FlatList,
     Image,
     Pressable,
@@ -16,6 +17,12 @@ import { ThemedText } from "@/components/themed-text";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
 import { setGlobalAlertFunction } from "@/lib/budgetNotification";
 import { supabase } from "@/lib/supabase";
+
+// Get screen dimensions for responsive design
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
+const isLargeScreen = screenWidth >= 414;
 
 // Import BudgetAlerts conditionally
 let BudgetAlerts: any = null;
@@ -271,8 +278,8 @@ export default function HomeScreen() {
               </View>
             </View>
 
-            {/* Budget Alerts - Tạm thời tắt để test */}
-            {/* {BudgetAlerts && <BudgetAlerts />} */}
+            {/* Budget Alerts */}
+            {BudgetAlerts && <BudgetAlerts />}
 
             {/* Quick Actions */}
             <View style={styles.quickActions}>
@@ -454,34 +461,34 @@ const styles = StyleSheet.create({
   },
   
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     paddingTop: 16,
     paddingBottom: 100,
   },
 
-  // Header
+  // Header - Responsive
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: isSmallScreen ? 20 : isMediumScreen ? 24 : 28,
     paddingTop: 8,
   },
   greeting: {
-    fontSize: 32,
+    fontSize: isSmallScreen ? 26 : isMediumScreen ? 30 : 32,
     fontWeight: '900',
     letterSpacing: -1.2,
     color: '#0f172a',
   },
   subtitle: {
-    fontSize: 15,
+    fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
     color: '#64748b',
     marginTop: 4,
     fontWeight: '600',
   },
   addButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    height: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    borderRadius: isSmallScreen ? 22 : isMediumScreen ? 24 : 26,
     backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
@@ -492,18 +499,18 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   addButtonText: {
-    fontSize: 28,
+    fontSize: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
     color: '#ffffff',
     fontWeight: '300',
     marginTop: -2,
   },
 
-  // Hero Card
+  // Hero Card - Responsive
   heroCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 28,
-    padding: 20,
-    marginBottom: 24,
+    borderRadius: isSmallScreen ? 20 : isMediumScreen ? 24 : 28,
+    padding: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
+    marginBottom: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     marginHorizontal: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 12 },
@@ -520,18 +527,18 @@ const styles = StyleSheet.create({
   },
   amountContainer: {
     backgroundColor: '#ffffff',
-    padding: 16,
+    padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#f3f4f6',
     width: '100%',
-    minHeight: 80,
+    minHeight: isSmallScreen ? 60 : isMediumScreen ? 70 : 80,
     justifyContent: 'center',
     alignItems: 'center',
   },
   heroLabel: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
     color: '#64748b',
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -539,7 +546,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   heroAmount: {
-    fontSize: 32,
+    fontSize: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
     fontWeight: '900',
     color: '#000000',
     letterSpacing: -1,
@@ -547,63 +554,66 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
     width: '100%',
     flexShrink: 1,
-    lineHeight: 40,
+    lineHeight: isSmallScreen ? 30 : isMediumScreen ? 35 : 40,
     paddingVertical: 8,
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
   statsRow: {
-    flexDirection: 'row',
+    flexDirection: isSmallScreen ? 'column' : 'row',
     alignItems: 'center',
+    gap: isSmallScreen ? 12 : 0,
   },
   statItem: {
-    flex: 1,
+    flex: isSmallScreen ? 0 : 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
+    width: isSmallScreen ? '100%' : 'auto',
   },
   statIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: isSmallScreen ? 36 : isMediumScreen ? 40 : 44,
+    height: isSmallScreen ? 36 : isMediumScreen ? 40 : 44,
+    borderRadius: isSmallScreen ? 10 : isMediumScreen ? 12 : 14,
     backgroundColor: 'rgba(16, 185, 129, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   statIcon: {
-    fontSize: 20,
+    fontSize: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 12,
     color: '#94a3b8',
     fontWeight: '600',
     marginBottom: 2,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     fontWeight: '800',
     color: '#000000',
     letterSpacing: -0.5,
     backgroundColor: 'transparent',
   },
   statDivider: {
-    width: 1,
-    height: 40,
+    width: isSmallScreen ? '100%' : 1,
+    height: isSmallScreen ? 1 : 40,
     backgroundColor: '#e2e8f0',
-    marginHorizontal: 12,
+    marginHorizontal: isSmallScreen ? 0 : 12,
+    marginVertical: isSmallScreen ? 8 : 0,
   },
 
-  // Quick Actions
+  // Quick Actions - Responsive
   quickActions: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
+    gap: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
+    marginBottom: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
   },
   actionCard: {
     flex: 1,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    paddingVertical: 20,
+    borderRadius: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
+    paddingVertical: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -614,38 +624,39 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.03)',
   },
   actionIconBg: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    height: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    borderRadius: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: isSmallScreen ? 8 : isMediumScreen ? 9 : 10,
   },
   actionIcon: {
-    fontSize: 26,
+    fontSize: isSmallScreen ? 20 : isMediumScreen ? 23 : 26,
   },
   actionLabel: {
-    fontSize: 13,
+    fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
     fontWeight: '800',
     color: '#0f172a',
     letterSpacing: -0.2,
+    textAlign: 'center',
   },
 
-  // Transactions Header
+  // Transactions Header - Responsive
   txHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
   },
   txTitle: {
-    fontSize: 24,
+    fontSize: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
     fontWeight: '900',
     color: '#0f172a',
     letterSpacing: -0.8,
   },
   txSubtitle: {
-    fontSize: 13,
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 12 : 13,
     color: '#94a3b8',
     marginTop: 2,
     fontWeight: '600',
@@ -654,30 +665,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: isSmallScreen ? 6 : isMediumScreen ? 7 : 8,
+    paddingHorizontal: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
     borderRadius: 12,
     backgroundColor: '#f8fafc',
   },
   viewAllText: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : isMediumScreen ? 13 : 14,
     fontWeight: '700',
     color: '#6366f1',
   },
   viewAllArrow: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     color: '#6366f1',
     fontWeight: '600',
   },
 
-  // Transaction Card
+  // Transaction Card - Responsive
   txCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: isSmallScreen ? 10 : isMediumScreen ? 12 : 14,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 16,
+    borderRadius: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
+    padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -695,9 +706,9 @@ const styles = StyleSheet.create({
     width: 4,
   },
   txIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    height: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
+    borderRadius: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
@@ -705,22 +716,22 @@ const styles = StyleSheet.create({
     borderColor: '#e2e8f0',
   },
   txIconImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
+    width: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
+    height: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
+    borderRadius: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
   },
   txEmoji: {
-    fontSize: 26,
+    fontSize: isSmallScreen ? 20 : isMediumScreen ? 23 : 26,
   },
   txCardTitle: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     fontWeight: '800',
     color: '#0f172a',
     marginBottom: 4,
     letterSpacing: -0.3,
   },
   txCardMeta: {
-    fontSize: 13,
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 12 : 13,
     color: '#94a3b8',
     fontWeight: '600',
   },
@@ -730,58 +741,59 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   txCardAmount: {
-    fontSize: 18,
+    fontSize: isSmallScreen ? 16 : isMediumScreen ? 17 : 18,
     fontWeight: '900',
   },
   txCardValue: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     fontWeight: '800',
     letterSpacing: -0.4,
   },
 
-  // Empty State
+  // Empty State - Responsive
   loadingContainer: {
-    paddingVertical: 80,
+    paddingVertical: isSmallScreen ? 60 : isMediumScreen ? 70 : 80,
     alignItems: 'center',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 32,
+    paddingVertical: isSmallScreen ? 40 : isMediumScreen ? 50 : 60,
+    paddingHorizontal: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
   },
   emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: isSmallScreen ? 80 : isMediumScreen ? 90 : 100,
+    height: isSmallScreen ? 80 : isMediumScreen ? 90 : 100,
+    borderRadius: isSmallScreen ? 40 : isMediumScreen ? 45 : 50,
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
     borderWidth: 3,
     borderColor: '#e2e8f0',
   },
   emptyIcon: {
-    fontSize: 48,
+    fontSize: isSmallScreen ? 36 : isMediumScreen ? 42 : 48,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: isSmallScreen ? 18 : isMediumScreen ? 20 : 22,
     fontWeight: '900',
     color: '#0f172a',
     marginBottom: 8,
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   emptyDescription: {
-    fontSize: 15,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 14 : 15,
     color: '#94a3b8',
     textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 28,
+    lineHeight: isSmallScreen ? 20 : isMediumScreen ? 21 : 22,
+    marginBottom: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
     fontWeight: '500',
   },
   emptyButton: {
     backgroundColor: '#6366f1',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
+    paddingVertical: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+    paddingHorizontal: isSmallScreen ? 28 : isMediumScreen ? 30 : 32,
     borderRadius: 16,
     shadowColor: '#6366f1',
     shadowOffset: { width: 0, height: 8 },
@@ -791,7 +803,7 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: '#ffffff',
-    fontSize: 15,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 14 : 15,
     fontWeight: '800',
     letterSpacing: -0.2,
   },

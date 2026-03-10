@@ -2,15 +2,21 @@ import { BudgetAlert, checkBudgetAndNotify } from '@/lib/budgetNotification';
 import { supabase } from '@/lib/supabase';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+
+// Get screen dimensions for responsive design
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
 
 export default function BudgetAlerts() {
   const [alerts, setAlerts] = useState<BudgetAlert[]>([]);
@@ -66,6 +72,12 @@ export default function BudgetAlerts() {
             styles.alertCard,
             alert.percentage >= 100 ? styles.dangerCard : styles.warningCard
           ]}>
+            {/* Background gradient */}
+            <View style={alert.percentage >= 100 ? styles.dangerGradient : styles.warningGradient} />
+            
+            {/* Decorative circle */}
+            <View style={styles.decorativeCircle} />
+
             <View style={styles.alertHeader}>
               <Text style={styles.alertIcon}>
                 {alert.percentage >= 100 ? '🚨' : '⚠️'}
@@ -140,97 +152,159 @@ function formatDateRange(startDate: string, endDate: string): string {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 8,
+    marginVertical: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
   },
   loadingContainer: {
-    padding: 16,
+    padding: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     alignItems: 'center',
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
+    gap: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
   },
   alertCard: {
-    width: 280,
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
+    width: isSmallScreen ? 260 : isMediumScreen ? 280 : 300,
+    padding: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
+    borderRadius: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
+    borderWidth: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+    position: 'relative',
+    overflow: 'hidden',
   },
   warningCard: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#f59e0b',
+    backgroundColor: '#ffffff',
   },
   dangerCard: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#ef4444',
+    backgroundColor: '#ffffff',
+  },
+  // Gradient backgrounds
+  warningGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fef3c7',
+    opacity: 0.2,
+  },
+  dangerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fee2e2',
+    opacity: 0.2,
   },
   alertHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
+    position: 'relative',
+    zIndex: 10,
   },
   alertIcon: {
-    fontSize: 24,
+    fontSize: isSmallScreen ? 28 : isMediumScreen ? 30 : 32,
   },
   dismissButton: {
-    padding: 4,
-    borderRadius: 12,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    padding: isSmallScreen ? 6 : isMediumScreen ? 7 : 8,
+    borderRadius: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   dismissText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: 'bold',
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
+    color: '#6b7280',
+    fontWeight: '800',
   },
   alertTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: isSmallScreen ? 18 : isMediumScreen ? 19 : 20,
+    fontWeight: '900',
+    marginBottom: isSmallScreen ? 5 : isMediumScreen ? 5 : 6,
+    letterSpacing: -0.5,
+    position: 'relative',
+    zIndex: 10,
   },
   categoryName: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+    fontWeight: '700',
+    marginBottom: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     opacity: 0.8,
+    position: 'relative',
+    zIndex: 10,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
+    marginBottom: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
+    position: 'relative',
+    zIndex: 10,
   },
   progressBar: {
     flex: 1,
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 4,
+    height: isSmallScreen ? 8 : isMediumScreen ? 9 : 10,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 6,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 6,
   },
   percentageText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    minWidth: 35,
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
+    fontWeight: '900',
+    minWidth: isSmallScreen ? 35 : isMediumScreen ? 38 : 40,
     textAlign: 'right',
+    letterSpacing: -0.3,
   },
   amountContainer: {
-    marginBottom: 8,
+    marginBottom: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
+    position: 'relative',
+    zIndex: 10,
   },
   spentAmount: {
-    fontSize: 13,
-    fontWeight: '600',
-    marginBottom: 2,
+    fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
+    fontWeight: '800',
+    marginBottom: isSmallScreen ? 3 : isMediumScreen ? 3 : 4,
+    letterSpacing: -0.2,
   },
   budgetAmount: {
-    fontSize: 12,
+    fontSize: isSmallScreen ? 12 : isMediumScreen ? 12 : 13,
     opacity: 0.7,
+    fontWeight: '600',
   },
   periodText: {
-    fontSize: 11,
+    fontSize: isSmallScreen ? 11 : isMediumScreen ? 11 : 12,
     opacity: 0.6,
+    fontWeight: '600',
+    position: 'relative',
+    zIndex: 10,
+  },
+  // Decorative elements
+  decorativeCircle: {
+    position: 'absolute',
+    top: isSmallScreen ? -15 : isMediumScreen ? -18 : -20,
+    right: isSmallScreen ? -15 : isMediumScreen ? -18 : -20,
+    width: isSmallScreen ? 50 : isMediumScreen ? 55 : 60,
+    height: isSmallScreen ? 50 : isMediumScreen ? 55 : 60,
+    borderRadius: isSmallScreen ? 25 : isMediumScreen ? 27.5 : 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: 1,
   },
 });

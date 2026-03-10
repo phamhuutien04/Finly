@@ -1,6 +1,7 @@
 import React from 'react';
 import {
     Animated,
+    Dimensions,
     Modal,
     Pressable,
     StyleSheet,
@@ -9,6 +10,11 @@ import {
 } from 'react-native';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
+
+// Get screen dimensions for responsive design
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+const isMediumScreen = screenWidth >= 375 && screenWidth < 414;
 
 interface BudgetAlertProps {
   visible: boolean;
@@ -60,6 +66,13 @@ export default function BudgetAlert({
             styles.alertCard,
             isOverBudget ? styles.dangerCard : styles.warningCard
           ]}>
+            {/* Background gradient */}
+            <View style={isOverBudget ? styles.dangerGradient : styles.warningGradient} />
+            
+            {/* Decorative circles */}
+            <View style={styles.decorativeCircle1} />
+            <View style={styles.decorativeCircle2} />
+
             {/* Icon */}
             <View style={[
               styles.iconContainer,
@@ -104,9 +117,10 @@ export default function BudgetAlert({
               style={({ pressed }) => [
                 styles.button,
                 isOverBudget ? styles.dangerButton : styles.warningButton,
-                pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
+                pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] }
               ]}
             >
+              <View style={styles.buttonGradient} />
               <Text style={styles.buttonText}>
                 {isOverBudget ? '😰 Đã hiểu' : '👍 OK'}
               </Text>
@@ -121,60 +135,95 @@ export default function BudgetAlert({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
   },
   alertContainer: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: isSmallScreen ? 320 : isMediumScreen ? 340 : 360,
   },
   alertCard: {
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
+    padding: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
     alignItems: 'center',
     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 16,
+    borderWidth: 0,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  warningCard: {
+    backgroundColor: '#ffffff',
+    borderColor: 'transparent',
+  },
+  dangerCard: {
+    backgroundColor: '#ffffff',
+    borderColor: 'transparent',
+  },
+  // Gradient backgrounds
+  warningGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fef3c7',
+    opacity: 0.3,
+  },
+  dangerGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#fee2e2',
+    opacity: 0.3,
+  },
+  iconContainer: {
+    width: isSmallScreen ? 80 : isMediumScreen ? 88 : 96,
+    height: isSmallScreen ? 80 : isMediumScreen ? 88 : 96,
+    borderRadius: isSmallScreen ? 40 : isMediumScreen ? 44 : 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
+    borderWidth: 4,
+    position: 'relative',
+    zIndex: 10,
+  },
+  warningIcon: {
+    backgroundColor: '#ffffff',
+    borderColor: '#f59e0b',
+    shadowColor: '#f59e0b',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
-    elevation: 12,
-    borderWidth: 2,
-  },
-  warningCard: {
-    backgroundColor: '#fffbeb',
-    borderColor: '#f59e0b',
-  },
-  dangerCard: {
-    backgroundColor: '#fef2f2',
-    borderColor: '#ef4444',
-  },
-  iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 3,
-  },
-  warningIcon: {
-    backgroundColor: '#fef3c7',
-    borderColor: '#f59e0b',
+    elevation: 8,
   },
   dangerIcon: {
-    backgroundColor: '#fee2e2',
+    backgroundColor: '#ffffff',
     borderColor: '#ef4444',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
   iconText: {
-    fontSize: 36,
+    fontSize: isSmallScreen ? 40 : isMediumScreen ? 44 : 48,
   },
   title: {
-    fontSize: 22,
+    fontSize: isSmallScreen ? 22 : isMediumScreen ? 24 : 26,
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 12,
-    letterSpacing: -0.5,
+    marginBottom: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
+    letterSpacing: -0.8,
+    position: 'relative',
+    zIndex: 10,
   },
   warningText: {
     color: '#d97706',
@@ -183,37 +232,55 @@ const styles = StyleSheet.create({
     color: '#dc2626',
   },
   message: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 15 : isMediumScreen ? 16 : 17,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-    opacity: 0.8,
+    lineHeight: isSmallScreen ? 22 : isMediumScreen ? 24 : 26,
+    marginBottom: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
+    opacity: 0.85,
     fontWeight: '500',
+    color: '#374151',
+    position: 'relative',
+    zIndex: 10,
   },
   progressContainer: {
     width: '100%',
-    marginBottom: 24,
+    marginBottom: isSmallScreen ? 28 : isMediumScreen ? 30 : 32,
+    position: 'relative',
+    zIndex: 10,
   },
   progressBar: {
-    height: 8,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 4,
+    height: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 8,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   button: {
     width: '100%',
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingVertical: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
+    borderRadius: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    position: 'relative',
+    zIndex: 10,
+    overflow: 'hidden',
   },
   warningButton: {
     backgroundColor: '#f59e0b',
@@ -221,10 +288,41 @@ const styles = StyleSheet.create({
   dangerButton: {
     backgroundColor: '#ef4444',
   },
+  buttonGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: -0.2,
+    fontSize: isSmallScreen ? 16 : isMediumScreen ? 17 : 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+    position: 'relative',
+    zIndex: 10,
+  },
+  // Decorative elements
+  decorativeCircle1: {
+    position: 'absolute',
+    top: isSmallScreen ? -30 : isMediumScreen ? -35 : -40,
+    right: isSmallScreen ? -30 : isMediumScreen ? -35 : -40,
+    width: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
+    height: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
+    borderRadius: isSmallScreen ? 50 : isMediumScreen ? 55 : 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    zIndex: 1,
+  },
+  decorativeCircle2: {
+    position: 'absolute',
+    bottom: isSmallScreen ? -20 : isMediumScreen ? -25 : -30,
+    left: isSmallScreen ? -20 : isMediumScreen ? -25 : -30,
+    width: isSmallScreen ? 60 : isMediumScreen ? 70 : 80,
+    height: isSmallScreen ? 60 : isMediumScreen ? 70 : 80,
+    borderRadius: isSmallScreen ? 30 : isMediumScreen ? 35 : 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    zIndex: 1,
   },
 });
