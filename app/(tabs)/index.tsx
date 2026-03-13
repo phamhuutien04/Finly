@@ -164,7 +164,7 @@ export default function HomeScreen() {
         `)
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(5);
 
       if (recentErr) throw recentErr;
 
@@ -261,7 +261,7 @@ export default function HomeScreen() {
             };
 
             // Thêm vào đầu danh sách
-            setTxs(prev => [newTxUI, ...prev.slice(0, 19)]); // Giữ tối đa 20 items
+            setTxs(prev => [newTxUI, ...prev.slice(0, 4)]); // Giữ tối đa 5 items
           }
         )
         .on(
@@ -497,30 +497,12 @@ export default function HomeScreen() {
             {/* Budget Alerts */}
             {BudgetAlerts && <BudgetAlerts />}
 
-            {/* Quick Actions */}
+            {/* Quick Action - Budget Only */}
             <View style={styles.quickActions}>
-              <QuickAction 
-                icon="💰" 
-                label="Thêm thu" 
-                href="/modal"
-                gradient={['#10b981', '#059669']}
-              />
-              <QuickAction 
-                icon="💸" 
-                label="Thêm chi" 
-                href="/modal"
-                gradient={['#ef4444', '#dc2626']}
-              />
-              <QuickAction 
-                icon="📊" 
-                label="Báo cáo" 
-                href="/explore"
-                gradient={['#3b82f6', '#2563eb']}
-              />
               <QuickAction 
                 icon="🎯" 
                 label="Ngân sách" 
-                href="tab/listbudgets"
+                href="/tab/listbudgets"
                 gradient={['#8b5cf6', '#7c3aed']}
               />
             </View>
@@ -853,17 +835,17 @@ const styles = StyleSheet.create({
     marginVertical: isSmallScreen ? 8 : 0,
   },
 
-  // Quick Actions - Responsive
+  // Quick Actions - Single Budget Button
   quickActions: {
     flexDirection: 'row',
-    gap: isSmallScreen ? 8 : isMediumScreen ? 10 : 12,
+    justifyContent: 'flex-start',
     marginBottom: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
   },
   actionCard: {
-    flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     paddingVertical: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
+    paddingHorizontal: isSmallScreen ? 32 : isMediumScreen ? 36 : 40,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
@@ -872,6 +854,7 @@ const styles = StyleSheet.create({
     elevation: 4,
     borderWidth: 1,
     borderColor: 'rgba(0,0,0,0.03)',
+    minWidth: isSmallScreen ? 120 : isMediumScreen ? 140 : 160,
   },
   actionIconBg: {
     width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
@@ -885,7 +868,7 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 20 : isMediumScreen ? 23 : 26,
   },
   actionLabel: {
-    fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 13,
+    fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
     fontWeight: '800',
     color: '#0f172a',
     letterSpacing: -0.2,
