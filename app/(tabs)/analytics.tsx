@@ -1,20 +1,20 @@
 // src/screens/AnalyticsScreen.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   Platform,
   Pressable,
   ScrollView,
   Text,
   View,
-  ActivityIndicator,
-  Image,
 } from 'react-native';
 
 import { Picker } from '@react-native-picker/picker';
 
-import { supabase } from '@/lib/supabase';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { supabase } from '@/lib/supabase';
 
 // Victory setup
 let V: any;
@@ -152,6 +152,157 @@ export default function AnalyticsScreen() {
     };
 
     fetchData();
+
+    // Realtime subscription cho analytics
+    const setupRealtimeSubscriptions = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      console.log('🔄 Setting up realtime subscriptions for analytics page');
+
+      // Subscribe to transactions và categories changes
+      const analyticsChannel = supabase
+        .channel('analytics_page_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          async (payload) => {
+            console.log('📊 New transaction for analytics:', payload.new);
+            const newTx = payload.new as any;
+            
+            // Lấy thông tin category cho transaction mới
+            const { data: categoryData } = await supabase
+              .from('categories')
+              .select('id, name, type, emoji, icon_uri, icon_preset_id')
+              .eq('id', newTx.category_id)
+              .single();
+
+            const newTransaction: Transaction = {
+              ...newTx,
+              category: categoryData || undefined
+            };
+
+            // Thêm vào đầu danh sách transactions
+            setAllTransactions(prev => [newTransaction, ...prev.slice(0, 1999)]);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📊 Transaction updated for analytics:', payload.new);
+            const updatedTx = payload.new as any;
+            
+            setAllTransactions(prev => prev.map(tx => 
+              tx.id === updatedTx.id 
+                ? { ...tx, ...updatedTx }
+                : tx
+            ));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📊 Transaction deleted for analytics:', payload.old);
+            const deletedTx = payload.old as any;
+            
+            setAllTransactions(prev => prev.filter(tx => tx.id !== deletedTx.id));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📂 New category for analytics:', payload.new);
+            const newCategory = payload.new as Category;
+            
+            setCategoriesMap(prev => ({
+              ...prev,
+              [newCategory.id]: newCategory
+            }));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📂 Category updated for analytics:', payload.new);
+            const updatedCategory = payload.new as Category;
+            
+            setCategoriesMap(prev => ({
+              ...prev,
+              [updatedCategory.id]: updatedCategory
+            }));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('📂 Category deleted for analytics:', payload.old);
+            const deletedCategory = payload.old as Category;
+            
+            setCategoriesMap(prev => {
+              const newMap = { ...prev };
+              delete newMap[deletedCategory.id];
+              return newMap;
+            });
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Analytics realtime status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Analytics page realtime connected');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Analytics page realtime error');
+          }
+        });
+
+      return analyticsChannel;
+    };
+
+    let realtimeChannel: any = null;
+    setupRealtimeSubscriptions().then(channel => {
+      realtimeChannel = channel;
+    });
+
+    return () => {
+      if (realtimeChannel) {
+        console.log('🧹 Cleaning up analytics realtime subscriptions');
+        realtimeChannel.unsubscribe();
+      }
+    };
   }, []);
 
   // ──────────────────────────────────────────────

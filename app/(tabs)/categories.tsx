@@ -1,8 +1,10 @@
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
   Modal,
@@ -11,9 +13,7 @@ import {
   StyleSheet,
   TextInput,
   View,
-  Dimensions,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -149,6 +149,100 @@ export default function CategoriesScreen() {
 
   useEffect(() => {
     fetchCategories();
+
+    // Realtime subscription cho categories và transactions
+    const setupRealtimeSubscriptions = async () => {
+      const userId = await getUserId();
+      if (!userId) return;
+
+      console.log('🔄 Setting up realtime subscriptions for categories page');
+
+      // Subscribe to categories và transactions changes
+      const categoriesChannel = supabase
+        .channel('categories_page_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📂 New category added:', payload.new);
+            const newCategory = payload.new as CategoryRow;
+            setCategories(prev => [{ ...newCategory, total_amount: 0 }, ...prev]);
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📂 Category updated:', payload.new);
+            const updatedCategory = payload.new as CategoryRow;
+            setCategories(prev => prev.map(cat => 
+              cat.id === updatedCategory.id 
+                ? { ...updatedCategory, total_amount: cat.total_amount }
+                : cat
+            ));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📂 Category deleted:', payload.old);
+            const deletedCategory = payload.old as CategoryRow;
+            setCategories(prev => prev.filter(cat => cat.id !== deletedCategory.id));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📊 Transaction changed, updating category totals:', payload.eventType);
+            // Reload để cập nhật total amounts cho categories
+            fetchCategories();
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Categories realtime status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Categories page realtime connected');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Categories page realtime error');
+          }
+        });
+
+      return categoriesChannel;
+    };
+
+    let realtimeChannel: any = null;
+    setupRealtimeSubscriptions().then(channel => {
+      realtimeChannel = channel;
+    });
+
+    return () => {
+      if (realtimeChannel) {
+        console.log('🧹 Cleaning up categories realtime subscriptions');
+        realtimeChannel.unsubscribe();
+      }
+    };
   }, [selectedYear, selectedMonth, selectedDay, filterMode]);
 
   const hasTypeCol = useMemo(() => categories.some((c) => c.type != null), [categories]);
