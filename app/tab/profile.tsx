@@ -1,18 +1,19 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -37,6 +38,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [profile, setProfile] = useState<UserProfile>({
     email: "",
     display_name: "",
@@ -50,6 +52,90 @@ export default function ProfileScreen() {
   useEffect(() => {
     loadProfile();
   }, []);
+
+  // Pick and upload avatar
+  const pickAvatar = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Lỗi', 'Cần quyền truy cập thư viện ảnh');
+        return;
+      }
+
+      // Pick image
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+
+      setUploadingAvatar(true);
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        Alert.alert('Lỗi', 'Vui lòng đăng nhập lại');
+        return;
+      }
+
+      // Get file info
+      const uri = result.assets[0].uri;
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${user.id}.${fileExt}`;
+
+      // Convert to blob
+      const response = await fetch(uri);
+      const blob = await response.blob();
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, blob, {
+          contentType: `image/${fileExt}`,
+          upsert: true, // Overwrite if exists
+        });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        Alert.alert('Lỗi', 'Không thể tải ảnh lên: ' + uploadError.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // Cache busting
+
+      // Update user metadata
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: {
+          avatar_url: avatarUrl,
+        },
+      });
+
+      if (updateError) {
+        console.error('Update error:', updateError);
+        Alert.alert('Lỗi', 'Không thể cập nhật ảnh đại diện: ' + updateError.message);
+        return;
+      }
+
+      // Update local state
+      setProfile(prev => ({ ...prev, avatar_url: avatarUrl }));
+
+      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện');
+    } catch (error: any) {
+      console.error('Error picking avatar:', error);
+      Alert.alert('Lỗi', error.message);
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -73,16 +159,21 @@ export default function ProfileScreen() {
       if (data) {
         setProfile({
           email: data.email || user.email || "",
-          display_name: data.display_name || "",
+          display_name: data.display_name || user.user_metadata?.display_name || "",
           bio: data.bio || "",
-          avatar_url: data.avatar_url || "",
+          avatar_url: data.avatar_url || user.user_metadata?.avatar_url || "",
           location: data.location || "",
           website: data.website || "",
           is_public: data.is_public ?? true,
         });
       } else {
-        // Set email from auth user if profile doesn't exist
-        setProfile(prev => ({ ...prev, email: user.email || "" }));
+        // Set data from auth user if profile doesn't exist
+        setProfile(prev => ({ 
+          ...prev, 
+          email: user.email || "",
+          display_name: user.user_metadata?.display_name || user.user_metadata?.full_name || "",
+          avatar_url: user.user_metadata?.avatar_url || "",
+        }));
       }
     } catch (error: any) {
       console.error("Error loading profile:", error);
@@ -113,6 +204,18 @@ export default function ProfileScreen() {
         });
 
       if (error) throw error;
+
+      // Also update auth user metadata to keep in sync
+      const { error: authError } = await supabase.auth.updateUser({
+        data: {
+          display_name: profile.display_name.trim() || null,
+          avatar_url: profile.avatar_url.trim() || null,
+        },
+      });
+
+      if (authError) {
+        console.warn('Warning: Could not update auth metadata:', authError);
+      }
 
       Alert.alert("Thành công", "Đã lưu thông tin cá nhân!");
       router.back();
@@ -150,22 +253,32 @@ export default function ProfileScreen() {
           {/* Avatar Section */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
-              {profile.avatar_url ? (
-                <Image
-                  source={{ uri: profile.avatar_url }}
-                  style={styles.avatarImage}
-                />
-              ) : (
-                <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
-                  <Ionicons name="person" size={48} color="#9ca3af" />
-                </View>
-              )}
-              <Pressable style={styles.avatarEditButton}>
+              <Pressable onPress={pickAvatar} disabled={uploadingAvatar}>
+                {uploadingAvatar ? (
+                  <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
+                    <ActivityIndicator size="large" color="#6366f1" />
+                  </View>
+                ) : profile.avatar_url ? (
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
+                    <Ionicons name="person" size={48} color="#9ca3af" />
+                  </View>
+                )}
+              </Pressable>
+              <Pressable 
+                style={styles.avatarEditButton}
+                onPress={pickAvatar}
+                disabled={uploadingAvatar}
+              >
                 <Ionicons name="camera" size={20} color="#fff" />
               </Pressable>
             </View>
             <ThemedText style={styles.avatarHint}>
-              Nhấn để thay đổi ảnh đại diện
+              {uploadingAvatar ? 'Đang tải ảnh lên...' : 'Nhấn để thay đổi ảnh đại diện'}
             </ThemedText>
           </View>
 

@@ -476,7 +476,10 @@ export default function SocialScreen() {
     const subtitle = profile.bio || profile.email || "";
 
     return (
-      <Pressable style={styles.friendCard}>
+      <Pressable 
+        style={styles.friendCard}
+        onPress={() => router.push(`/friend-profile/${profile.user_id}` as any)}
+      >
         <View style={styles.avatarContainer}>
           {profile.avatar_url ? (
             <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
@@ -498,7 +501,13 @@ export default function SocialScreen() {
           )}
         </View>
 
-        <Pressable style={styles.messageButton}>
+        <Pressable 
+          style={styles.messageButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            router.push(`/chat/${profile.user_id}` as any);
+          }}
+        >
           <Ionicons name="chatbubble-outline" size={20} color="#6366f1" />
         </Pressable>
       </Pressable>
@@ -567,16 +576,22 @@ export default function SocialScreen() {
         case "accepted":
           return (
             <View style={styles.buttonGroup}>
-              <Pressable style={[styles.actionButton, styles.messageButton]}>
+              <Pressable 
+                style={[styles.actionButton, styles.messageButton]}
+                onPress={() => router.push(`/chat/${item.user_id}` as any)}
+              >
                 <Ionicons name="chatbubble" size={16} color="#1877f2" />
                 <ThemedText style={[styles.buttonText, styles.messageButtonText]}>
                   Nhắn tin
                 </ThemedText>
               </Pressable>
-              <Pressable style={[styles.actionButton, styles.friendsButton]}>
-                <Ionicons name="people" size={16} color="#42b883" />
+              <Pressable 
+                style={[styles.actionButton, styles.friendsButton]}
+                onPress={() => router.push(`/friend-profile/${item.user_id}` as any)}
+              >
+                <Ionicons name="person" size={16} color="#42b883" />
                 <ThemedText style={[styles.buttonText, styles.friendsButtonText]}>
-                  Bạn bè
+                  Xem hồ sơ
                 </ThemedText>
               </Pressable>
             </View>
@@ -643,10 +658,13 @@ export default function SocialScreen() {
                   Kết bạn
                 </ThemedText>
               </Pressable>
-              <Pressable style={[styles.actionButton, styles.messageButton]}>
-                <Ionicons name="chatbubble" size={16} color="#1877f2" />
+              <Pressable 
+                style={[styles.actionButton, styles.messageButton]}
+                onPress={() => router.push(`/friend-profile/${item.user_id}` as any)}
+              >
+                <Ionicons name="person" size={16} color="#1877f2" />
                 <ThemedText style={[styles.buttonText, styles.messageButtonText]}>
-                  Nhắn tin
+                  Xem hồ sơ
                 </ThemedText>
               </Pressable>
             </View>
@@ -713,11 +731,18 @@ export default function SocialScreen() {
       {/* Header */}
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>Bạn bè</ThemedText>
-        <Link href="/tab/profile" asChild>
-          <Pressable style={styles.profileButton}>
-            <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
-          </Pressable>
-        </Link>
+        <View style={styles.headerButtons}>
+          <Link href="/chat/messages" asChild>
+            <Pressable style={styles.headerButton}>
+              <Ionicons name="chatbubbles-outline" size={28} color="#6366f1" />
+            </Pressable>
+          </Link>
+          <Link href="/tab/profile" asChild>
+            <Pressable style={styles.profileButton}>
+              <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+            </Pressable>
+          </Link>
+        </View>
       </View>
 
       {/* Tabs */}
@@ -872,6 +897,14 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
     fontWeight: "900",
     letterSpacing: -1,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerButton: {
+    padding: 4,
   },
   profileButton: {
     padding: 4,
