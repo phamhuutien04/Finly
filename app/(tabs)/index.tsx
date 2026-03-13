@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
+import { useNotifications } from "@/hooks/useNotifications";
 import { setGlobalAlertFunction } from "@/lib/budgetNotification";
 import { supabase } from "@/lib/supabase";
 
@@ -96,6 +98,7 @@ function formatTimeLabel(iso: string) {
 export default function HomeScreen() {
   const router = useRouter();
   const { showAlert, AlertComponent } = useBudgetAlert();
+  const { unreadCount } = useNotifications();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -422,16 +425,39 @@ export default function HomeScreen() {
                 <ThemedText style={styles.subtitle}>{monthLabel}</ThemedText>
               </View>
 
-              <Link href="/tab/modal" asChild>
-                <Pressable 
-                  style={({ pressed }) => [
-                    styles.addButton,
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }
-                  ]}
-                >
-                  <ThemedText style={styles.addButtonText}>+</ThemedText>
-                </Pressable>
-              </Link>
+              <View style={styles.headerButtons}>
+                {/* Notification Button */}
+                <Link href="/tab/notifications" asChild>
+                  <Pressable 
+                    style={({ pressed }) => [
+                      styles.notificationButton,
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    <Ionicons name="notifications-outline" size={24} color="#374151" />
+                    {/* Badge for unread notifications - only show if count > 0 */}
+                    {unreadCount > 0 && (
+                      <View style={styles.notificationBadge}>
+                        <ThemedText style={styles.notificationBadgeText}>
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </ThemedText>
+                      </View>
+                    )}
+                  </Pressable>
+                </Link>
+
+                {/* Add Transaction Button */}
+                <Link href="/tab/modal" asChild>
+                  <Pressable 
+                    style={({ pressed }) => [
+                      styles.addButton,
+                      pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }
+                    ]}
+                  >
+                    <Ionicons name="add" size={28} color="#000" />
+                  </Pressable>
+                </Link>
+              </View>
             </View>
 
             {/* Hero Balance Card */}
@@ -675,24 +701,58 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '600',
   },
-  addButton: {
-    width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
-    height: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
-    borderRadius: isSmallScreen ? 22 : isMediumScreen ? 24 : 26,
-    backgroundColor: '#6366f1',
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  notificationButton: {
+    position: 'relative',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  addButtonText: {
-    fontSize: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
-    color: '#ffffff',
-    fontWeight: '300',
-    marginTop: -2,
+  notificationBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: '#ef4444',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#fafafa',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  addButton: {
+    width: isSmallScreen ? 48 : isMediumScreen ? 52 : 56,
+    height: isSmallScreen ? 48 : isMediumScreen ? 52 : 56,
+    borderRadius: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 10,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
 
   // Hero Card - Responsive
