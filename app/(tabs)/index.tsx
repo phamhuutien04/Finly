@@ -1,16 +1,16 @@
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -200,7 +200,197 @@ export default function HomeScreen() {
       if (!session?.user) router.replace("/auth/login");
     });
 
-    return () => listener.subscription.unsubscribe();
+    // Realtime subscription cho transactions, categories, và budgets
+    const setupRealtimeSubscriptions = async () => {
+      const userId = await getUserId();
+      if (!userId) return;
+
+      console.log('🔄 Setting up realtime subscriptions for home page');
+
+      // Subscribe to transactions, categories, and budgets changes
+      const homeChannel = supabase
+        .channel('home_data_updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${userId}`,
+          },
+          async (payload) => {
+            console.log('📊 New transaction added:', payload.new);
+            const newTx = payload.new as any;
+            
+            // Cập nhật balance ngay lập tức
+            const amount = Number(newTx.amount || 0);
+            if (newTx.type === 'income') {
+              setIncome(prev => prev + amount);
+              setBalance(prev => prev + amount);
+            } else if (newTx.type === 'expense') {
+              setExpense(prev => prev + amount);
+              setBalance(prev => prev - amount);
+            }
+
+            // Lấy thông tin category cho transaction mới
+            const { data: categoryData } = await supabase
+              .from('categories')
+              .select('name, emoji, icon_uri, icon_preset_id')
+              .eq('id', newTx.category_id)
+              .single();
+
+            // Tạo transaction UI object
+            const cat = categoryData || {} as any;
+            const catName = cat.name?.trim() || cat.icon_preset_id?.trim() || "Khác";
+            const title = newTx.note?.trim() || catName;
+            const timeIso = newTx.created_at || newTx.transaction_date || newTx.occurred_at || "";
+            const time = timeIso ? formatTimeLabel(timeIso) : "Không rõ";
+
+            const newTxUI: TransactionUI = {
+              id: String(newTx.id),
+              title,
+              category: catName,
+              type: newTx.type,
+              amount,
+              time,
+              iconEmoji: cat.emoji ?? null,
+              iconUri: cat.icon_uri ?? null,
+            };
+
+            // Thêm vào đầu danh sách
+            setTxs(prev => [newTxUI, ...prev.slice(0, 19)]); // Giữ tối đa 20 items
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${userId}`,
+          },
+          async (payload) => {
+            console.log('📊 Transaction updated:', payload.new);
+            const updatedTx = payload.new as any;
+            const oldTx = payload.old as any;
+            
+            // Cập nhật balance (trừ cũ, cộng mới)
+            const oldAmount = Number(oldTx.amount || 0);
+            const newAmount = Number(updatedTx.amount || 0);
+            
+            if (oldTx.type === 'income') {
+              setIncome(prev => prev - oldAmount);
+              setBalance(prev => prev - oldAmount);
+            } else if (oldTx.type === 'expense') {
+              setExpense(prev => prev - oldAmount);
+              setBalance(prev => prev + oldAmount);
+            }
+            
+            if (updatedTx.type === 'income') {
+              setIncome(prev => prev + newAmount);
+              setBalance(prev => prev + newAmount);
+            } else if (updatedTx.type === 'expense') {
+              setExpense(prev => prev + newAmount);
+              setBalance(prev => prev - newAmount);
+            }
+
+            // Cập nhật trong danh sách transactions
+            setTxs(prev => prev.map(tx => {
+              if (tx.id === String(updatedTx.id)) {
+                return {
+                  ...tx,
+                  amount: newAmount,
+                  type: updatedTx.type,
+                  title: updatedTx.note?.trim() || tx.category,
+                };
+              }
+              return tx;
+            }));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'transactions',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📊 Transaction deleted:', payload.old);
+            const deletedTx = payload.old as any;
+            
+            // Cập nhật balance
+            const amount = Number(deletedTx.amount || 0);
+            if (deletedTx.type === 'income') {
+              setIncome(prev => prev - amount);
+              setBalance(prev => prev - amount);
+            } else if (deletedTx.type === 'expense') {
+              setExpense(prev => prev - amount);
+              setBalance(prev => prev + amount);
+            }
+
+            // Xóa khỏi danh sách
+            setTxs(prev => prev.filter(tx => tx.id !== String(deletedTx.id)));
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'categories',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('📂 Category changed:', payload.eventType, payload.new || payload.old);
+            // Chỉ reload khi có thay đổi category (ảnh hưởng đến hiển thị transactions)
+            if (payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
+              // Reload để cập nhật tên category trong transactions
+              loadAll();
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'budgets',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            console.log('💰 Budget changed:', payload.eventType, payload.new || payload.old);
+            // Reload data when budgets change (affects budget alerts)
+            loadAll();
+          }
+        )
+        .subscribe((status) => {
+          console.log('📡 Home realtime status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Home page realtime connected');
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Home page realtime error');
+          } else if (status === 'CLOSED') {
+            console.log('🔒 Home page realtime closed');
+          }
+        });
+
+      return homeChannel;
+    };
+
+    let realtimeChannel: any = null;
+    setupRealtimeSubscriptions().then(channel => {
+      realtimeChannel = channel;
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+      if (realtimeChannel) {
+        console.log('🧹 Cleaning up home realtime subscriptions');
+        realtimeChannel.unsubscribe();
+      }
+    };
   }, [router]);
 
   const onRefresh = async () => {
