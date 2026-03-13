@@ -2,15 +2,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, Stack, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -28,11 +28,13 @@ const DEFAULT_CATEGORIES = [
   { name: "Di chuyển", type: "expense", emoji: "🛵", icon_preset_id: "car", icon_uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" },
   { name: "Mua sắm", type: "expense", emoji: "🛍️", icon_preset_id: "shopping", icon_uri: "https://cdn-icons-png.flaticon.com/512/3081/3081559.png" },
   { name: "Hóa đơn", type: "expense", emoji: "🧾", icon_preset_id: "bill", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135706.png" },
+  { name: "Khác", type: "expense", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
 
   // income
   { name: "Lương", type: "income", emoji: "💵", icon_preset_id: "salary", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" },
   { name: "Thưởng", type: "income", emoji: "🎁", icon_preset_id: "gift", icon_uri: "https://cdn-icons-png.flaticon.com/512/4202/4202306.png" },
   { name: "Chuyển khoản", type: "income", emoji: "🏦", icon_preset_id: "bank", icon_uri: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png" },
+  { name: "Khác", type: "income", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
 ] as const;
 
 async function ensureSeedCategories(userId: string) {
@@ -121,7 +123,11 @@ export default function RegisterScreen() {
         email: e,
         password: pass,
         options: {
-          data: { full_name: n },
+          data: { 
+            full_name: n,
+            display_name: n,  // Thêm display_name để trigger lấy được
+            name: n,
+          },
         },
       });
 
@@ -140,20 +146,6 @@ export default function RegisterScreen() {
       }
 
       const user = data.user;
-
-      // ✅ Upsert profiles (tuỳ chọn)
-      if (user?.id) {
-        const { error: profileErr } = await supabase.from("profiles").upsert(
-          {
-            id: user.id,
-            full_name: n,
-            email: e,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        );
-        if (profileErr) console.log("profiles upsert error:", profileErr.message);
-      }
 
       // ✅ SEED categories (CHỈ khi có session => tức là đã đăng nhập)
       if (data.session && user?.id) {

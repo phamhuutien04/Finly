@@ -1,8 +1,10 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -59,6 +61,14 @@ type CategoryRow = {
   icon_preset_id?: string | null;
 };
 
+type Friend = {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  email?: string;
+};
+
 const normalizeTxType = (t: any): TxType => (t === "income" ? "income" : "expense");
 
 export default function ModalAddTransactionNoAccount() {
@@ -77,10 +87,30 @@ export default function ModalAddTransactionNoAccount() {
   const [transactionDate, setTransactionDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
 
+  // Split transaction states
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
+  const [showFriendPicker, setShowFriendPicker] = useState<boolean>(false);
+  const [friendSearchQuery, setFriendSearchQuery] = useState<string>("");
+
   const amountNumber = useMemo(() => {
     const cleaned = amountText.replace(/[^\d]/g, "");
     return cleaned ? Number(cleaned) : 0;
   }, [amountText]);
+
+  // Calculate split amount per person
+  const splitAmount = useMemo(() => {
+    const totalParticipants = selectedFriends.length + 1; // +1 for current user
+    return totalParticipants > 1 ? Math.round(amountNumber / totalParticipants) : amountNumber;
+  }, [amountNumber, selectedFriends.length]);
+
+  const filteredFriends = useMemo(() => {
+    if (!friendSearchQuery.trim()) return friends;
+    return friends.filter(friend => 
+      (friend.display_name || "").toLowerCase().includes(friendSearchQuery.toLowerCase()) ||
+      (friend.email || "").toLowerCase().includes(friendSearchQuery.toLowerCase())
+    );
+  }, [friends, friendSearchQuery]);
 
   const getUserId = async () => {
     const { data, error } = await supabase.auth.getUser();
@@ -122,6 +152,41 @@ export default function ModalAddTransactionNoAccount() {
     return (data2 as CategoryRow[]) ?? [];
   };
 
+  const fetchFriends = async () => {
+    const uid = await getUserId();
+    if (!uid) return [];
+
+    try {
+      // Get accepted friendships
+      const { data: friendships, error } = await supabase
+        .from("friendships")
+        .select("friend_id")
+        .eq("user_id", uid)
+        .eq("status", "accepted");
+
+      if (error || !friendships || friendships.length === 0) {
+        return [];
+      }
+
+      // Get friend profiles
+      const friendIds = friendships.map(f => f.friend_id);
+      const { data: profiles, error: profileError } = await supabase
+        .from("user_profiles")
+        .select("id, user_id, display_name, avatar_url, email")
+        .in("user_id", friendIds);
+
+      if (profileError) {
+        console.error("Error loading friend profiles:", profileError);
+        return [];
+      }
+
+      return (profiles as Friend[]) || [];
+    } catch (error) {
+      console.error("Error fetching friends:", error);
+      return [];
+    }
+  };
+
   const filteredCategories = useMemo(() => {
     // category.type null => cho hiện hết
     return categories.filter((c) => !c.type || normalizeTxType(c.type) === type);
@@ -153,9 +218,11 @@ export default function ModalAddTransactionNoAccount() {
         }
 
         const cats = await fetchCategories();
+        const friendsList = await fetchFriends();
 
         if (!mounted) return;
         setCategories(cats);
+        setFriends(friendsList);
 
         // set mặc định theo type hiện tại (expense)
         setCategoryId(pickDefaultCategoryId(type, cats));
@@ -201,17 +268,262 @@ export default function ModalAddTransactionNoAccount() {
 
       setSaving(true);
 
-      // ✅ KHÔNG account_id
-      const { error: insErr } = await supabase.from("transactions").insert({
-        user_id: user.id,
-        category_id: categoryId,
-        amount: amountNumber,
-        type,
-        transaction_date: transactionDate.toISOString(),
-        note: note.trim() || null,
-      });
+      const isSplit = selectedFriends.length > 0;
+      const totalParticipants = selectedFriends.length + 1;
 
-      if (insErr) throw insErr;
+      if (isSplit) {
+        // Create main transaction (split transaction)
+        const { data: mainTransaction, error: mainError } = await supabase
+          .from("transactions")
+          .insert({
+            user_id: user.id,
+            category_id: categoryId,
+            amount: splitAmount,
+            type,
+            transaction_date: transactionDate.toISOString(),
+            note: note.trim() || null,
+            is_split: true,
+            split_total_amount: amountNumber,
+            split_participants: totalParticipants,
+          })
+          .select(`
+            *,
+            category:categories(name, emoji, icon_uri)
+          `)
+          .single();
+
+        if (mainError) throw mainError;
+
+        // Create split participant record for current user
+        const { error: participantError } = await supabase
+          .from("split_transaction_participants")
+          .insert({
+            transaction_id: mainTransaction.id,
+            user_id: user.id,
+            amount: splitAmount,
+            is_creator: true,
+          });
+
+        if (participantError) throw participantError;
+
+        // Get current user's display name and selected category info
+        const { data: currentUserProfile } = await supabase
+          .from("user_profiles")
+          .select("display_name")
+          .eq("user_id", user.id)
+          .single();
+
+        const { data: selectedCategory } = await supabase
+          .from("categories")
+          .select("name, type, emoji, icon_uri, icon_preset_id")
+          .eq("id", categoryId)
+          .single();
+
+        const currentUserDisplayName = currentUserProfile?.display_name || user.email?.split('@')[0] || 'bạn';
+
+        console.log(`🎯 Main transaction category:`, selectedCategory);
+        console.log(`👤 Current user: ${currentUserDisplayName}`);
+        console.log(`👥 Selected friends:`, selectedFriends.map(f => f.display_name));
+
+        // Find matching category for each friend - prioritize same name, fallback to "Khác"
+        const getMatchingCategoryForUser = async (userId: string) => {
+          try {
+            if (!selectedCategory) {
+              console.log(`No selected category found`);
+              return null;
+            }
+
+            console.log(`Looking for category "${selectedCategory.name}" (type: ${selectedCategory.type}) for user ${userId}`);
+
+            // Step 1: Try to find existing category with EXACT same name and type
+            const { data: exactMatch, error: findError } = await supabase
+              .from("categories")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("name", selectedCategory.name)
+              .eq("type", selectedCategory.type)
+              .single();
+
+            if (!findError && exactMatch) {
+              console.log(`✅ Found exact match category ${exactMatch.id} for user ${userId}`);
+              return exactMatch.id;
+            }
+
+            console.log(`❌ No exact match found for "${selectedCategory.name}", trying to create it...`);
+
+            // Step 2: Try to create matching category with same name
+            const { data: newCategory, error: createError } = await supabase
+              .from("categories")
+              .insert({
+                user_id: userId,
+                name: selectedCategory.name,
+                type: selectedCategory.type,
+                emoji: selectedCategory.emoji || '📝',
+                icon_uri: selectedCategory.icon_uri,
+                icon_preset_id: selectedCategory.icon_preset_id || 'other'
+              })
+              .select("id")
+              .single();
+
+            if (!createError && newCategory) {
+              console.log(`✅ Created new category "${selectedCategory.name}" with id ${newCategory.id} for user ${userId}`);
+              return newCategory.id;
+            }
+
+            console.log(`❌ Failed to create "${selectedCategory.name}":`, createError?.message);
+
+            // Step 3: Fallback to "Khác" category with same type
+            const { data: otherCategory, error: otherError } = await supabase
+              .from("categories")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("name", "Khác")
+              .eq("type", selectedCategory.type)
+              .single();
+
+            if (!otherError && otherCategory) {
+              console.log(`✅ Using existing "Khác" category ${otherCategory.id} for user ${userId}`);
+              return otherCategory.id;
+            }
+
+            console.log(`❌ No "Khác" category found, creating it...`);
+
+            // Step 4: Create "Khác" category as final fallback
+            const { data: createdOther, error: createOtherError } = await supabase
+              .from("categories")
+              .insert({
+                user_id: userId,
+                name: "Khác",
+                type: selectedCategory.type,
+                emoji: "📝",
+                icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png",
+                icon_preset_id: "other"
+              })
+              .select("id")
+              .single();
+
+            if (!createOtherError && createdOther) {
+              console.log(`✅ Created "Khác" category ${createdOther.id} for user ${userId}`);
+              return createdOther.id;
+            }
+
+            console.error(`❌ Failed to create "Khác" category for user ${userId}:`, createOtherError?.message);
+
+            // Step 5: Last resort - find ANY category with same type
+            const { data: anyCategory } = await supabase
+              .from("categories")
+              .select("id")
+              .eq("user_id", userId)
+              .eq("type", selectedCategory.type)
+              .limit(1)
+              .single();
+
+            if (anyCategory) {
+              console.log(`⚠️ Using any available category ${anyCategory.id} for user ${userId}`);
+              return anyCategory.id;
+            }
+
+            console.error(`❌ No suitable category found for user ${userId}`);
+            return null;
+
+          } catch (error) {
+            console.error("❌ Unexpected error in getMatchingCategoryForUser:", error);
+            return null;
+          }
+        };
+
+        // Create transactions for each friend with matching category
+        const friendTransactions = [];
+        for (const friend of selectedFriends) {
+          console.log(`\n🔍 Processing friend: ${friend.display_name} (${friend.user_id})`);
+          
+          const friendCategoryId = await getMatchingCategoryForUser(friend.user_id);
+          
+          console.log(`📁 Friend ${friend.display_name}: categoryId = ${friendCategoryId}`);
+          
+          const friendTransaction = {
+            user_id: friend.user_id,
+            category_id: friendCategoryId,
+            amount: splitAmount,
+            type,
+            transaction_date: transactionDate.toISOString(),
+            note: `Chia tiền với ${currentUserDisplayName}: ${note.trim() || 'Giao dịch'}`,
+            is_split: true,
+            split_total_amount: amountNumber,
+            split_participants: totalParticipants,
+            original_transaction_id: mainTransaction.id,
+          };
+          
+          console.log(`💾 Friend transaction for ${friend.display_name}:`, friendTransaction);
+          friendTransactions.push(friendTransaction);
+        }
+
+        console.log(`Creating ${friendTransactions.length} friend transactions:`, friendTransactions);
+
+        const { data: friendTransactionData, error: friendError } = await supabase
+          .from("transactions")
+          .insert(friendTransactions)
+          .select();
+
+        if (friendError) {
+          console.error("Error creating friend transactions:", friendError);
+          // Don't throw error, just log it - main transaction already succeeded
+          Alert.alert(
+            "Cảnh báo", 
+            `Giao dịch chính đã lưu thành công, nhưng có lỗi khi tạo giao dịch cho bạn bè: ${friendError.message}`
+          );
+        } else {
+          console.log(`Successfully created ${friendTransactionData?.length || 0} friend transactions`);
+        }
+
+        // Create split participant records for friends (only if friend transactions were created successfully)
+        if (friendTransactionData && friendTransactionData.length > 0) {
+          const friendParticipants = friendTransactionData.map((tx) => ({
+            transaction_id: tx.id,
+            user_id: tx.user_id,
+            amount: splitAmount,
+            is_creator: false,
+          }));
+
+          const { error: friendParticipantError } = await supabase
+            .from("split_transaction_participants")
+            .insert(friendParticipants);
+
+          if (friendParticipantError) {
+            console.error("Error creating friend participant records:", friendParticipantError);
+            // Don't throw error, just log it
+          }
+        }
+
+        Alert.alert(
+          "Thành công", 
+          `Đã chia ${amountNumber.toLocaleString('vi-VN')}đ cho ${totalParticipants} người (${splitAmount.toLocaleString('vi-VN')}đ/người)!`
+        );
+      } else {
+        // Regular transaction
+        const { data: newTransaction, error: insErr } = await supabase
+          .from("transactions")
+          .insert({
+            user_id: user.id,
+            category_id: categoryId,
+            amount: amountNumber,
+            type,
+            transaction_date: transactionDate.toISOString(),
+            note: note.trim() || null,
+          })
+          .select(`
+            *,
+            category:categories(name, emoji, icon_uri)
+          `)
+          .single();
+
+        if (insErr) throw insErr;
+        
+        Alert.alert(
+          "Thành công", 
+          "Đã thêm giao dịch!"
+        );
+      }
 
       // Kiểm tra ngân sách nếu là giao dịch chi tiêu
       if (type === "expense" && checkBudgetAfterTransaction) {
@@ -219,17 +531,17 @@ export default function ModalAddTransactionNoAccount() {
           await checkBudgetAfterTransaction(
             user.id,
             Number(categoryId),
-            amountNumber,
+            isSplit ? splitAmount : amountNumber,
             transactionDate.toISOString().split('T')[0]
           );
         } catch (budgetError) {
           console.log('Lỗi kiểm tra ngân sách:', budgetError);
-          // Không hiển thị lỗi cho user vì đây chỉ là tính năng phụ
         }
       }
 
-      Alert.alert("Thành công", "Đã thêm giao dịch!");
+      // Navigate back to home screen
       router.back();
+
     } catch (e: any) {
       Alert.alert("Lỗi", e?.message ?? "Không lưu được giao dịch.");
     } finally {
@@ -411,6 +723,141 @@ export default function ModalAddTransactionNoAccount() {
               <TextInput value={note} onChangeText={setNote} placeholder="vd: Trà sữa" style={styles.input} />
             </View>
 
+            {/* Split with Friends */}
+            {type === "expense" && (
+              <>
+                <ThemedText style={[styles.label, { marginTop: 14 }]}>Chia tiền với bạn bè</ThemedText>
+                
+                {/* Selected Friends */}
+                {selectedFriends.length > 0 && (
+                  <View style={styles.selectedFriendsContainer}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {selectedFriends.map((friend) => (
+                        <View key={friend.user_id} style={styles.selectedFriendItem}>
+                          <View style={styles.friendAvatar}>
+                            {friend.avatar_url ? (
+                              <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatarImage} />
+                            ) : (
+                              <Ionicons name="person" size={20} color="#9ca3af" />
+                            )}
+                          </View>
+                          <ThemedText style={styles.friendName} numberOfLines={1}>
+                            {friend.display_name || "Bạn"}
+                          </ThemedText>
+                          <Pressable
+                            onPress={() => setSelectedFriends(prev => prev.filter(f => f.user_id !== friend.user_id))}
+                            style={styles.removeFriendButton}
+                          >
+                            <Ionicons name="close-circle" size={16} color="#ef4444" />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Add Friends Button */}
+                <Pressable onPress={() => setShowFriendPicker(true)} style={styles.addFriendButton}>
+                  <Ionicons name="person-add" size={20} color="#6366f1" />
+                  <ThemedText style={styles.addFriendButtonText}>
+                    {selectedFriends.length > 0 ? "Thêm bạn khác" : "Thêm bạn bè"}
+                  </ThemedText>
+                </Pressable>
+
+                {/* Split Amount Display */}
+                {selectedFriends.length > 0 && amountNumber > 0 && (
+                  <View style={styles.splitInfoContainer}>
+                    <ThemedText style={styles.splitInfoText}>
+                      Tổng: {amountNumber.toLocaleString('vi-VN')}đ ÷ {selectedFriends.length + 1} người = {splitAmount.toLocaleString('vi-VN')}đ/người
+                    </ThemedText>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Friend Picker Modal */}
+            {showFriendPicker && (
+              <View style={styles.friendPickerModal}>
+                <View style={styles.friendPickerContent}>
+                  <View style={styles.friendPickerHeader}>
+                    <ThemedText style={styles.friendPickerTitle}>Chọn bạn bè</ThemedText>
+                    <Pressable onPress={() => setShowFriendPicker(false)}>
+                      <Ionicons name="close" size={24} color="#6b7280" />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.friendSearchContainer}>
+                    <Ionicons name="search" size={20} color="#9ca3af" />
+                    <TextInput
+                      style={styles.friendSearchInput}
+                      placeholder="Tìm kiếm bạn bè..."
+                      value={friendSearchQuery}
+                      onChangeText={setFriendSearchQuery}
+                    />
+                  </View>
+
+                  <FlatList
+                    data={filteredFriends}
+                    keyExtractor={(item) => item.user_id}
+                    style={styles.friendsList}
+                    renderItem={({ item }) => {
+                      const isSelected = selectedFriends.some(f => f.user_id === item.user_id);
+                      return (
+                        <Pressable
+                          style={[styles.friendItem, isSelected && styles.friendItemSelected]}
+                          onPress={() => {
+                            if (isSelected) {
+                              setSelectedFriends(prev => prev.filter(f => f.user_id !== item.user_id));
+                            } else {
+                              setSelectedFriends(prev => [...prev, item]);
+                            }
+                          }}
+                        >
+                          <View style={styles.friendAvatar}>
+                            {item.avatar_url ? (
+                              <Image source={{ uri: item.avatar_url }} style={styles.friendAvatarImage} />
+                            ) : (
+                              <Ionicons name="person" size={24} color="#9ca3af" />
+                            )}
+                          </View>
+                          <View style={styles.friendInfo}>
+                            <ThemedText style={styles.friendDisplayName}>
+                              {item.display_name || "Bạn"}
+                            </ThemedText>
+                            {item.email && (
+                              <ThemedText style={styles.friendEmail}>
+                                {item.email}
+                              </ThemedText>
+                            )}
+                          </View>
+                          <View style={[styles.friendCheckbox, isSelected && styles.friendCheckboxSelected]}>
+                            {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+                          </View>
+                        </Pressable>
+                      );
+                    }}
+                    ListEmptyComponent={
+                      <View style={styles.emptyFriends}>
+                        <Ionicons name="people-outline" size={48} color="#d1d5db" />
+                        <ThemedText style={styles.emptyFriendsText}>
+                          {friendSearchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
+                        </ThemedText>
+                      </View>
+                    }
+                  />
+
+                  <Pressable
+                    onPress={() => setShowFriendPicker(false)}
+                    style={styles.friendPickerDoneButton}
+                  >
+                    <ThemedText style={styles.friendPickerDoneText}>
+                      Xong ({selectedFriends.length})
+                    </ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
             {/* Save */}
             <Pressable onPress={save} disabled={saving} style={[styles.btn, saving && { opacity: 0.6 }]}>
               {saving ? <ActivityIndicator /> : <ThemedText style={styles.btnText}>Lưu giao dịch</ThemedText>}
@@ -515,5 +962,175 @@ const styles = StyleSheet.create({
     padding: 20,
     width: "90%",
     maxWidth: 400,
+  },
+
+  // Split with Friends Styles
+  selectedFriendsContainer: {
+    marginBottom: 12,
+  },
+  selectedFriendItem: {
+    alignItems: "center",
+    marginRight: 12,
+    width: 80,
+  },
+  friendAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  friendAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  friendName: {
+    fontSize: 12,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  removeFriendButton: {
+    position: "absolute",
+    top: -4,
+    right: 8,
+    backgroundColor: "#fff",
+    borderRadius: 8,
+  },
+  addFriendButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#6366f1",
+    borderStyle: "dashed",
+    marginBottom: 12,
+  },
+  addFriendButtonText: {
+    color: "#6366f1",
+    fontWeight: "700",
+  },
+  splitInfoContainer: {
+    backgroundColor: "#f0f9ff",
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+  },
+  splitInfoText: {
+    color: "#0369a1",
+    fontWeight: "600",
+    textAlign: "center",
+  },
+
+  // Friend Picker Modal Styles
+  friendPickerModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  friendPickerContent: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 20,
+    width: "90%",
+    maxWidth: 400,
+    maxHeight: "80%",
+  },
+  friendPickerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  friendPickerTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  friendSearchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f9fafb",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    gap: 8,
+  },
+  friendSearchInput: {
+    flex: 1,
+    fontSize: 15,
+  },
+  friendsList: {
+    maxHeight: 300,
+  },
+  friendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginBottom: 8,
+  },
+  friendItemSelected: {
+    backgroundColor: "#f0f9ff",
+  },
+  friendInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  friendDisplayName: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  friendEmail: {
+    fontSize: 14,
+    color: "#6b7280",
+    marginTop: 2,
+  },
+  friendCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#d1d5db",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  friendCheckboxSelected: {
+    backgroundColor: "#6366f1",
+    borderColor: "#6366f1",
+  },
+  emptyFriends: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyFriendsText: {
+    color: "#9ca3af",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  friendPickerDoneButton: {
+    backgroundColor: "#6366f1",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  friendPickerDoneText: {
+    color: "#fff",
+    fontWeight: "700",
   },
 });
