@@ -7,7 +7,6 @@ import * as Sharing from 'expo-sharing';
 import React, { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Platform,
   Pressable,
@@ -20,6 +19,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { showAlert, showConfirm, showError, showInfo, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
 
 // Import NotificationTest conditionally
@@ -88,24 +88,22 @@ export default function SettingsScreen() {
     current: Option,
     onPick: (o: Option) => void
   ) => {
-    Alert.alert(
-      title,
-      `Đang chọn: ${current.label}`,
-      [
+    showAlert({
+      type: "info",
+      title: title,
+      message: `Đang chọn: ${current.label}`,
+      buttons: [
         ...options.map((o) => ({
           text: o.label,
           onPress: () => onPick(o),
         })),
-        { text: "Huỷ", style: "cancel" },
+        { text: "Huỷ", style: "cancel" as const },
       ]
-    );
+    });
   };
 
   const confirmDanger = (title: string, message: string, onYes: () => void) => {
-    Alert.alert(title, message, [
-      { text: "Huỷ", style: "cancel" },
-      { text: "Xác nhận", style: "destructive", onPress: onYes },
-    ]);
+    showConfirm(title, message, onYes, undefined, "Xác nhận", "Huỷ");
   };
 
   // Load current user profile
@@ -153,7 +151,7 @@ export default function SettingsScreen() {
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Lỗi', 'Cần quyền truy cập thư viện ảnh');
+        showError('Lỗi', 'Cần quyền truy cập thư viện ảnh');
         return;
       }
 
@@ -188,7 +186,7 @@ export default function SettingsScreen() {
 
       if (uploadError) {
         console.error('Upload error:', uploadError);
-        Alert.alert('Lỗi', 'Không thể tải ảnh lên: ' + uploadError.message);
+        showError('Lỗi', 'Không thể tải ảnh lên: ' + uploadError.message);
         return;
       }
 
@@ -208,7 +206,7 @@ export default function SettingsScreen() {
 
       if (updateError) {
         console.error('Update error:', updateError);
-        Alert.alert('Lỗi', 'Không thể cập nhật ảnh đại diện: ' + updateError.message);
+        showError('Lỗi', 'Không thể cập nhật ảnh đại diện: ' + updateError.message);
         return;
       }
 
@@ -217,10 +215,10 @@ export default function SettingsScreen() {
         setCurrentUser({ ...currentUser, avatar_url: avatarUrl });
       }
 
-      Alert.alert('Thành công', 'Đã cập nhật ảnh đại diện');
+      showSuccess('Thành công', 'Đã cập nhật ảnh đại diện');
     } catch (error: any) {
       console.error('Error picking avatar:', error);
-      Alert.alert('Lỗi', error.message);
+      showError('Lỗi', error.message);
     } finally {
       setUploadingAvatar(false);
     }
@@ -242,7 +240,7 @@ export default function SettingsScreen() {
       
       if (error) {
         console.error('Error updating profile:', error);
-        Alert.alert('Lỗi', 'Không thể cập nhật: ' + error.message);
+        showError('Lỗi', 'Không thể cập nhật: ' + error.message);
         return;
       }
       
@@ -254,17 +252,17 @@ export default function SettingsScreen() {
       });
       
       setShowEditProfileModal(false);
-      Alert.alert('Thành công', 'Đã cập nhật thông tin cá nhân');
+      showSuccess('Thành công', 'Đã cập nhật thông tin cá nhân');
     } catch (err: any) {
       console.error('Error:', err);
-      Alert.alert('Lỗi', 'Không thể cập nhật: ' + err.message);
+      showError('Lỗi', 'Không thể cập nhật: ' + err.message);
     }
   };
 
   // Export transactions to Excel
   const exportTransactions = async () => {
     if (!exportType) {
-      Alert.alert('Lỗi', 'Vui lòng chọn loại giao dịch');
+      showWarning('Lỗi', 'Vui lòng chọn loại giao dịch');
       return;
     }
 
@@ -272,7 +270,7 @@ export default function SettingsScreen() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+        showError('Lỗi', 'Vui lòng đăng nhập');
         return;
       }
 
@@ -286,12 +284,12 @@ export default function SettingsScreen() {
 
       if (error) {
         console.error('Error fetching transactions:', error);
-        Alert.alert('Lỗi', 'Không thể lấy dữ liệu: ' + error.message);
+        showError('Lỗi', 'Không thể lấy dữ liệu: ' + error.message);
         return;
       }
 
       if (!data || data.length === 0) {
-        Alert.alert('Thông báo', `Không có dữ liệu ${exportType === 'income' ? 'thu nhập' : 'chi tiêu'}`);
+        showInfo('Thông báo', `Không có dữ liệu ${exportType === 'income' ? 'thu nhập' : 'chi tiêu'}`);
         return;
       }
 
@@ -320,19 +318,19 @@ export default function SettingsScreen() {
         link.click();
         document.body.removeChild(link);
         
-        Alert.alert('Thành công', `Đã tải xuống ${data.length} giao dịch`);
+        showSuccess('Thành công', `Đã tải xuống ${data.length} giao dịch`);
       } else if (Platform.OS === 'android') {
         // Trên Android: Lưu trực tiếp vào Downloads
         try {
           await saveToDownloads(fileName, csvContent);
           
-          Alert.alert(
+          showSuccess(
             'Thành công', 
             `Đã lưu ${data.length} giao dịch vào thư mục Downloads\n\nTên file: ${fileName}`
           );
         } catch (fileError: any) {
           console.error('File save error:', fileError);
-          Alert.alert('Lỗi', 'Không thể lưu file: ' + fileError.message);
+          showError('Lỗi', 'Không thể lưu file: ' + fileError.message);
         }
       } else {
         // Trên iOS: Chia sẻ file
@@ -347,7 +345,7 @@ export default function SettingsScreen() {
           });
         } catch (fileError: any) {
           console.error('File save error:', fileError);
-          Alert.alert('Lỗi', 'Không thể tạo file: ' + fileError.message);
+          showError('Lỗi', 'Không thể tạo file: ' + fileError.message);
         }
       }
 
@@ -356,7 +354,7 @@ export default function SettingsScreen() {
       setExportType(null);
     } catch (err: any) {
       console.error('Export error:', err);
-      Alert.alert('Lỗi', 'Không thể xuất file: ' + err.message);
+      showError('Lỗi', 'Không thể xuất file: ' + err.message);
     } finally {
       setExportLoading(false);
     }
@@ -452,7 +450,7 @@ export default function SettingsScreen() {
           <RowPress
             title="Đổi mã PIN"
             subtitle="Thiết lập PIN để mở app"
-            onPress={() => Alert.alert("PIN", "Gắn màn hình đổi PIN vào đây.")}
+            onPress={() => showInfo("PIN", "Gắn màn hình đổi PIN vào đây.")}
           />
         </Section>
 
@@ -472,7 +470,7 @@ export default function SettingsScreen() {
           <RowPress
             title="Khôi phục dữ liệu"
             subtitle="Nhập lại từ bản sao lưu"
-            onPress={() => Alert.alert("Restore", "Import CSV/JSON ở đây.")}
+            onPress={() => showInfo("Restore", "Import CSV/JSON ở đây.")}
           />
         </Section>
 
@@ -480,12 +478,12 @@ export default function SettingsScreen() {
           <RowPress
             title="Giới thiệu"
             subtitle="Phiên bản 1.0.0"
-            onPress={() => Alert.alert("About", "App quản lí chi tiêu • Finly")}
+            onPress={() => showInfo("About", "App quản lí chi tiêu • Finly")}
           />
           <RowPress
             title="Điều khoản & Chính sách"
             subtitle="Xem nội dung"
-            onPress={() => Alert.alert("Policy", "Mở trang Terms/Privacy ở đây.")}
+            onPress={() => showInfo("Policy", "Mở trang Terms/Privacy ở đây.")}
           />
         </Section>
 
@@ -495,7 +493,7 @@ export default function SettingsScreen() {
             subtitle="Không thể khôi phục"
             onPress={() =>
               confirmDanger("Xoá dữ liệu", "Bạn chắc chắn muốn xoá toàn bộ dữ liệu?", () =>
-                Alert.alert("Đã xoá", "Mình đã xoá dữ liệu (demo).")
+                showSuccess("Đã xoá", "Mình đã xoá dữ liệu (demo).")
               )
             }
           />
@@ -504,7 +502,7 @@ export default function SettingsScreen() {
             subtitle="Thoát khỏi tài khoản hiện tại"
             onPress={() =>
               confirmDanger("Đăng xuất", "Bạn muốn đăng xuất?", () => {
-                Alert.alert("Đăng xuất", "Đã đăng xuất (demo).");
+                showSuccess("Đăng xuất", "Đã đăng xuất (demo).");
               })
             }
           />
