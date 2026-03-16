@@ -3,7 +3,6 @@ import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -18,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { showError, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
 
 // Import notification functions conditionally
@@ -227,7 +227,7 @@ export default function ModalAddTransactionNoAccount() {
         // set mặc định theo type hiện tại (expense)
         setCategoryId(pickDefaultCategoryId(type, cats));
       } catch (e: any) {
-        Alert.alert("Lỗi", e?.message ?? "Không tải được danh mục.");
+        showError("Lỗi", e?.message ?? "Không tải được danh mục.");
       } finally {
         if (mounted) setLoading(false);
       }
@@ -257,12 +257,12 @@ export default function ModalAddTransactionNoAccount() {
       }
 
       if (!categoryId) {
-        Alert.alert("Thiếu danh mục", `Bạn chưa có danh mục cho "${type === "expense" ? "Chi tiêu" : "Thu nhập"}".`);
+        showWarning("Thiếu danh mục", `Bạn chưa có danh mục cho "${type === "expense" ? "Chi tiêu" : "Thu nhập"}".`);
         return;
       }
 
       if (!amountNumber || amountNumber <= 0) {
-        Alert.alert("Số tiền không hợp lệ", "Nhập số tiền > 0 nhé.");
+        showWarning("Số tiền không hợp lệ", "Nhập số tiền > 0 nhé.");
         return;
       }
 
@@ -468,7 +468,7 @@ export default function ModalAddTransactionNoAccount() {
         if (friendError) {
           console.error("Error creating friend transactions:", friendError);
           // Don't throw error, just log it - main transaction already succeeded
-          Alert.alert(
+          showWarning(
             "Cảnh báo", 
             `Giao dịch chính đã lưu thành công, nhưng có lỗi khi tạo giao dịch cho bạn bè: ${friendError.message}`
           );
@@ -495,7 +495,7 @@ export default function ModalAddTransactionNoAccount() {
           }
         }
 
-        Alert.alert(
+        showSuccess(
           "Thành công", 
           `Đã chia ${amountNumber.toLocaleString('vi-VN')}đ cho ${totalParticipants} người (${splitAmount.toLocaleString('vi-VN')}đ/người)!`
         );
@@ -519,7 +519,7 @@ export default function ModalAddTransactionNoAccount() {
 
         if (insErr) throw insErr;
         
-        Alert.alert(
+        showSuccess(
           "Thành công", 
           "Đã thêm giao dịch!"
         );
@@ -543,7 +543,7 @@ export default function ModalAddTransactionNoAccount() {
       router.back();
 
     } catch (e: any) {
-      Alert.alert("Lỗi", e?.message ?? "Không lưu được giao dịch.");
+      showError("Lỗi", e?.message ?? "Không lưu được giao dịch.");
     } finally {
       setSaving(false);
     }
