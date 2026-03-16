@@ -2,21 +2,24 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { ThemedView } from "@/components/themed-view";
 import useRealtimeMessages from "@/hooks/useRealtimeMessages";
+import { showError, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -28,6 +31,7 @@ type Message = {
   sender_id: string;
   created_at: string;
   is_read: boolean;
+  message_type?: string;
 };
 
 type UserProfile = {
@@ -53,11 +57,128 @@ export default function ChatScreen() {
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Money request states
+  const [showMoneyRequestModal, setShowMoneyRequestModal] = useState(false);
+  const [requestAmount, setRequestAmount] = useState("");
+  const [requestReason, setRequestReason] = useState("");
+  const [sendingRequest, setSendingRequest] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<any>(null);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [processedRequests, setProcessedRequests] = useState<Set<string>>(new Set());
+
+  // Add state to track processed status for each message
+  const [messageProcessedStatus, setMessageProcessedStatus] = useState<Record<string, boolean>>({});
+
+  // Format number with thousand separators
+  const formatNumber = (value: string) => {
+    // Remove all non-digit characters
+    const numbers = value.replace(/[^\d]/g, '');
+    if (!numbers) return '';
+    
+    // Add thousand separators
+    return parseInt(numbers, 10).toLocaleString('vi-VN');
+  };
+
+  const handleAmountChange = (text: string) => {
+    const formatted = formatNumber(text);
+    setRequestAmount(formatted);
+  };
+
+  // Check processed status when messages load or update
+  useEffect(() => {
+    const checkAllMessageStatus = async () => {
+      if (!messages.length || !currentUserId || !userId) return;
+
+      try {
+        const statusChecks = messages
+          .filter(msg => msg.content.includes('💸 Yêu cầu thanh toán:'))
+          .map(async (msg) => {
+            try {
+              const isProcessed = await checkIfRequestProcessed(msg.content, msg.id);
+              return { messageId: msg.id, isProcessed };
+            } catch (error) {
+              console.error("Error checking message status:", error);
+              return { messageId: msg.id, isProcessed: false };
+            }
+          });
+
+        const results = await Promise.all(statusChecks);
+        const statusMap: Record<string, boolean> = {};
+        results.forEach(({ messageId, isProcessed }) => {
+          statusMap[messageId] = isProcessed;
+        });
+
+        setMessageProcessedStatus(statusMap);
+      } catch (error) {
+        console.error("Error checking all message status:", error);
+      }
+    };
+
+    checkAllMessageStatus();
+  }, [messages, currentUserId, userId]);
+
   useEffect(() => {
     if (userId) {
       loadChatData();
     }
   }, [userId]);
+
+  // Listen for new transactions to update payment status
+  useEffect(() => {
+    if (!currentUserId || !userId) return;
+
+    const channel = supabase
+      .channel('transaction-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'transactions',
+          filter: `user_id=in.(${currentUserId},${userId})`
+        },
+        async (payload) => {
+          console.log('🔔 New transaction detected:', payload);
+          
+          // Check if it's a payment transaction
+          const transaction = payload.new as any;
+          if (transaction.note?.includes('Trả tiền cho bạn bè') || transaction.note?.includes('Nhận tiền từ bạn bè')) {
+            console.log('💰 Payment transaction detected, refreshing status...');
+            
+            // Wait a bit for both transactions to be created
+            setTimeout(async () => {
+              // Refresh all message statuses
+              const statusChecks = messages
+                .filter(msg => msg.content.includes('💸 Yêu cầu thanh toán:'))
+                .map(async (msg) => {
+                  try {
+                    const isProcessed = await checkIfRequestProcessed(msg.content, msg.id);
+                    return { messageId: msg.id, isProcessed };
+                  } catch (error) {
+                    console.error("Error checking message status:", error);
+                    return { messageId: msg.id, isProcessed: false };
+                  }
+                });
+
+              const results = await Promise.all(statusChecks);
+              const statusMap: Record<string, boolean> = {};
+              results.forEach(({ messageId, isProcessed }) => {
+                statusMap[messageId] = isProcessed;
+              });
+
+              setMessageProcessedStatus(prev => ({ ...prev, ...statusMap }));
+              console.log('✅ Status refreshed:', statusMap);
+            }, 2000); // Wait 2 seconds for both transactions
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [currentUserId, userId, messages]);
 
   // Realtime subscription for new messages
   const handleNewMessage = useCallback((message: Message) => {
@@ -65,7 +186,10 @@ export default function ChatScreen() {
     setMessages(prev => {
       // Check if message already exists to avoid duplicates
       const exists = prev.some(m => m.id === message.id);
-      if (exists) return prev;
+      if (exists) {
+        console.log('⚠️ Message already exists, skipping:', message.id);
+        return prev;
+      }
       
       return [...prev, message];
     });
@@ -275,6 +399,336 @@ export default function ChatScreen() {
     }
   };
 
+  const sendMoneyRequest = async () => {
+    if (!requestAmount.trim() || !conversationId || !currentUserId || sendingRequest) return;
+
+    // Parse the formatted amount (remove dots)
+    const amount = parseFloat(requestAmount.replace(/\./g, ''));
+    if (isNaN(amount) || amount <= 0) {
+      showError("Lỗi", "Vui lòng nhập số tiền hợp lệ");
+      return;
+    }
+
+    if (!selectedCategory) {
+      showError("Lỗi", "Vui lòng chọn danh mục");
+      return;
+    }
+
+    try {
+      setSendingRequest(true);
+      
+      // Use the already formatted amount from input
+      const requestContent = `💸 Yêu cầu thanh toán: ${requestAmount} VND${requestReason.trim() ? ` - ${requestReason.trim()}` : ''} (${selectedCategory.name})`;
+      
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          sender_id: currentUserId,
+          content: requestContent,
+          message_type: 'text'  // Sử dụng 'text' thay vì 'money_request'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('❌ Error sending money request:', error);
+        throw error;
+      }
+
+      console.log('✅ Money request sent successfully:', data);
+      
+      // Clear form and close modal
+      setRequestAmount("");
+      setRequestReason("");
+      setSelectedCategory(null);
+      setShowMoneyRequestModal(false);
+      
+      showSuccess("Thành công", "Đã gửi yêu cầu thanh toán!");
+
+    } catch (error: any) {
+      console.error("Error sending money request:", error);
+      showError("Lỗi", "Không thể gửi yêu cầu thanh toán: " + error.message);
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    if (!currentUserId) return;
+    
+    try {
+      setLoadingCategories(true);
+      // Only load expense categories for money requests
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name, emoji, type")
+        .eq("user_id", currentUserId)
+        .eq("type", "expense") // Only expense categories
+        .order("name");
+
+      if (error) throw error;
+      setCategories(data || []);
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    } finally {
+      setLoadingCategories(false);
+    }
+  };
+
+  const checkIfRequestProcessed = async (messageContent: string, messageId: string) => {
+    if (!currentUserId || !userId) return false;
+
+    try {
+      // Only check for transactions with related_message_id
+      // This ensures accurate tracking without false positives
+      const { data: relatedTransactions, error: relatedError } = await supabase
+        .from("transactions")
+        .select("id, user_id, type")
+        .eq("related_message_id", messageId)
+        .limit(2);
+
+      if (relatedError) {
+        console.error("Error checking related transactions:", relatedError);
+        return false;
+      }
+
+      if (relatedTransactions && relatedTransactions.length > 0) {
+        console.log(`✅ Found ${relatedTransactions.length} transactions for message ${messageId}`);
+        return true;
+      }
+
+      console.log(`⚠️ No transactions found for message ${messageId}`);
+      return false;
+    } catch (error) {
+      console.error("Error checking request status:", error);
+      return false;
+    }
+  };
+
+  const handlePayMoneyRequest = async (messageContent: string, messageId: string) => {
+    if (!currentUserId || !conversationId) return;
+
+    // Check if already processed by looking for existing transaction
+    const isAlreadyProcessed = await checkIfRequestProcessed(messageContent, messageId);
+    if (isAlreadyProcessed) {
+      showWarning("Thông báo", "Yêu cầu này đã được thanh toán rồi");
+      return;
+    }
+
+    try {
+      // Parse amount and category from message content
+      // Updated regex to handle Vietnamese number format (50.000)
+      const amountMatch = messageContent.match(/(\d{1,3}(?:\.\d{3})*)\s*VND/);
+      const categoryMatch = messageContent.match(/\(([^)]+)\)$/);
+      
+      console.log('Message content:', messageContent);
+      console.log('Amount match:', amountMatch);
+      console.log('Category match:', categoryMatch);
+      
+      if (!amountMatch || !categoryMatch) {
+        showError("Lỗi", "Không thể xử lý yêu cầu thanh toán - không tìm thấy số tiền hoặc danh mục");
+        return;
+      }
+
+      // Handle Vietnamese number format (dots as thousand separators)
+      const amountString = amountMatch[1].replace(/\./g, '');
+      const amount = parseInt(amountString, 10);
+      const categoryName = categoryMatch[1];
+      const requesterUserId = userId; // Friend who requested money
+
+      console.log('Raw amount string:', amountMatch[1]);
+      console.log('Cleaned amount string:', amountString);
+      console.log('Parsed amount number:', amount);
+      console.log('Category name:', categoryName);
+      console.log('Requester user ID:', requesterUserId);
+
+      if (isNaN(amount) || amount <= 0) {
+        showError("Lỗi", `Số tiền không hợp lệ: ${amount}`);
+        return;
+      }
+
+      // Create transactions for both users
+      await createPaymentTransactions(amount, categoryName, requesterUserId, messageId);
+      
+      // Update both local state and processed status immediately
+      setProcessedRequests(prev => new Set([...prev, messageId]));
+      setMessageProcessedStatus(prev => ({ ...prev, [messageId]: true }));
+      
+      // Force refresh the message status for both users
+      setTimeout(async () => {
+        const statusChecks = messages
+          .filter(msg => msg.content.includes('💸 Yêu cầu thanh toán:'))
+          .map(async (msg) => {
+            try {
+              const isProcessed = await checkIfRequestProcessed(msg.content, msg.id);
+              return { messageId: msg.id, isProcessed };
+            } catch (error) {
+              console.error("Error checking message status:", error);
+              return { messageId: msg.id, isProcessed: false };
+            }
+          });
+
+        const results = await Promise.all(statusChecks);
+        const statusMap: Record<string, boolean> = {};
+        results.forEach(({ messageId, isProcessed }) => {
+          statusMap[messageId] = isProcessed;
+        });
+
+        setMessageProcessedStatus(prev => ({ ...prev, ...statusMap }));
+      }, 1000);
+      
+      showSuccess("Thành công", "Đã thanh toán thành công!");
+
+    } catch (error: any) {
+      console.error("Error processing payment:", error);
+      showError("Lỗi", "Không thể xử lý thanh toán: " + error.message);
+    }
+  };
+
+  const createPaymentTransactions = async (amount: number, categoryName: string, requesterUserId: string, messageId: string) => {
+    // Get current date
+    const transactionDate = new Date().toISOString();
+
+    // 1. Tạo giao dịch thu nhập cho người yêu cầu (requester)
+    await createTransactionForUser(requesterUserId, amount, "income", categoryName, `Nhận tiền từ bạn bè`, transactionDate, messageId);
+
+    // 2. Tạo giao dịch chi tiêu cho người trả tiền (current user)
+    await createTransactionForUser(currentUserId!, amount, "expense", categoryName, `Trả tiền cho bạn bè`, transactionDate, messageId);
+
+    // 3. Send a status update message to trigger realtime sync (hidden message)
+    const statusMessage = `✅ Thanh toán hoàn tất: ${amount.toLocaleString('vi-VN')} VND (${categoryName})`;
+    
+    await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: currentUserId,
+        content: statusMessage,
+        message_type: 'text'
+      });
+  };
+
+  const createTransactionForUser = async (userId: string, amount: number, type: "income" | "expense", categoryName: string, note: string, transactionDate: string, messageId: string) => {
+    try {
+      console.log(`Creating transaction for user ${userId}:`, {
+        amount,
+        type,
+        categoryName,
+        note,
+        messageId
+      });
+
+      // Find or create category for user
+      let categoryId = await findOrCreateCategory(userId, categoryName, type);
+      
+      console.log(`Found/created category ID: ${categoryId}`);
+
+      const transactionAmount = Math.abs(amount);
+      console.log(`Final transaction amount: ${transactionAmount}`);
+
+      if (transactionAmount <= 0) {
+        throw new Error(`Invalid amount: ${transactionAmount}`);
+      }
+
+      // Create transaction - amount should always be positive
+      const insertData = {
+        user_id: userId,
+        category_id: categoryId,
+        amount: transactionAmount,
+        type: type,
+        note: note,
+        transaction_date: transactionDate,
+        occurred_at: transactionDate,
+        related_message_id: messageId // Link to the money request message
+      };
+
+      console.log('Inserting transaction data:', insertData);
+
+      const { data, error } = await supabase
+        .from("transactions")
+        .insert(insertData)
+        .select();
+
+      if (error) {
+        console.error(`Transaction insert error:`, error);
+        throw error;
+      }
+
+      console.log(`✅ Transaction created successfully:`, data);
+
+      console.log(`✅ Transaction created successfully for user ${userId}`);
+    } catch (error) {
+      console.error(`Error creating transaction for user ${userId}:`, error);
+      throw error;
+    }
+  };
+
+  const findOrCreateCategory = async (userId: string, categoryName: string, type: "income" | "expense") => {
+    try {
+      // Try to find existing category with same name and type
+      const { data: existingCategory } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("name", categoryName)
+        .eq("type", type)
+        .single();
+
+      if (existingCategory) {
+        return existingCategory.id;
+      }
+
+      // Try to create new category with same name
+      const { data: newCategory, error: createError } = await supabase
+        .from("categories")
+        .insert({
+          user_id: userId,
+          name: categoryName,
+          type: type,
+          emoji: "💰",
+          icon_preset_id: "other"
+        })
+        .select("id")
+        .single();
+
+      if (!createError && newCategory) {
+        return newCategory.id;
+      }
+
+      // Fallback to "Khác" category
+      const { data: otherCategory } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("name", "Khác")
+        .eq("type", type)
+        .single();
+
+      if (otherCategory) {
+        return otherCategory.id;
+      }
+
+      // Create "Khác" category as final fallback
+      const { data: createdOther } = await supabase
+        .from("categories")
+        .insert({
+          user_id: userId,
+          name: "Khác",
+          type: type,
+          emoji: "📝",
+          icon_preset_id: "other"
+        })
+        .select("id")
+        .single();
+
+      return createdOther?.id;
+    } catch (error) {
+      console.error("Error finding/creating category:", error);
+      throw error;
+    }
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isMyMessage = item.sender_id === currentUserId;
     const messageTime = new Date(item.created_at).toLocaleTimeString("vi-VN", {
@@ -282,13 +736,78 @@ export default function ChatScreen() {
       minute: "2-digit",
     });
 
+    const isMoneyRequest = item.content.includes('💸 Yêu cầu thanh toán:');
+    const isPaymentComplete = item.content.includes('✅ Thanh toán hoàn tất:');
+    const isProcessedLocally = processedRequests.has(item.id);
+    const isProcessedInDB = messageProcessedStatus[item.id] || false;
+    const isProcessed = isProcessedLocally || isProcessedInDB;
+
+    // Don't show payment complete messages as separate bubbles
+    if (isPaymentComplete) {
+      return null;
+    }
+
     return (
       <View style={[styles.messageContainer, isMyMessage && styles.myMessageContainer]}>
-        <View style={[styles.messageBubble, isMyMessage ? styles.myMessageBubble : styles.friendMessageBubble]}>
-          <ThemedText style={[styles.messageText, isMyMessage && styles.myMessageText]}>
+        <View style={[
+          styles.messageBubble, 
+          isMyMessage ? styles.myMessageBubble : styles.friendMessageBubble,
+          isMoneyRequest && !isMyMessage && styles.moneyRequestBubble, // Only apply white background for received requests
+          isProcessed && isMyMessage && isMoneyRequest && styles.myProcessedRequestBubble,
+          isProcessed && !isMyMessage && isMoneyRequest && styles.processedRequestBubble
+        ]}>
+          {isMoneyRequest && (
+            <View style={styles.moneyRequestHeader}>
+              <Ionicons 
+                name={isProcessed ? "checkmark-circle" : "card-outline"} 
+                size={16} 
+                color={isMyMessage ? (isProcessed ? "#10b981" : "#fff") : "#000000"} 
+              />
+              <ThemedText style={[
+                styles.moneyRequestLabel, 
+                isMyMessage ? (isProcessed ? styles.myProcessedRequestLabel : styles.myMessageText) : styles.friendRequestLabel
+              ]}>
+                {isMyMessage 
+                  ? (isProcessed ? "ĐÃ ĐƯỢC THANH TOÁN" : "ĐANG CHỜ THANH TOÁN") 
+                  : (isProcessed ? "ĐÃ THANH TOÁN" : "YÊU CẦU THANH TOÁN")
+                }
+              </ThemedText>
+            </View>
+          )}
+          <ThemedText style={[
+            styles.messageText, 
+            isMyMessage && !isMoneyRequest && styles.myMessageText, // White text for my normal messages
+            isMyMessage && isMoneyRequest && !isProcessed && styles.myMessageText, // White text for my pending money requests
+            isMyMessage && isMoneyRequest && isProcessed && styles.myProcessedMessageText, // Dark green for my processed requests
+            !isMyMessage && isMoneyRequest && styles.moneyRequestText, // Black text for received money requests
+          ]}>
             {item.content}
           </ThemedText>
-          <ThemedText style={[styles.messageTime, isMyMessage && styles.myMessageTime]}>
+          {isMoneyRequest && !isMyMessage && !isProcessed && (
+            <View style={styles.moneyRequestActions}>
+              <Pressable 
+                style={styles.payButtonFull}
+                onPress={() => handlePayMoneyRequest(item.content, item.id)}
+              >
+                <ThemedText style={styles.payButtonText}>Thanh toán</ThemedText>
+              </Pressable>
+            </View>
+          )}
+          {isMoneyRequest && !isMyMessage && isProcessed && (
+            <View style={styles.processedIndicator}>
+              <Ionicons name="checkmark-circle" size={16} color="#000000" />
+              <ThemedText style={styles.processedText}>
+                Đã thanh toán
+              </ThemedText>
+            </View>
+          )}
+          <ThemedText style={[
+            styles.messageTime, 
+            isMyMessage && !isMoneyRequest && styles.myMessageTime, // White time for my normal messages
+            isMyMessage && isMoneyRequest && !isProcessed && styles.myMessageTime, // White time for my pending requests
+            isMyMessage && isMoneyRequest && isProcessed && { color: "#065f46", opacity: 0.7 }, // Dark green time for my processed requests
+            !isMyMessage && isMoneyRequest && { color: "#000000", opacity: 0.6 } // Black time for received money requests
+          ]}>
             {messageTime}
           </ThemedText>
         </View>
@@ -375,6 +894,15 @@ export default function ChatScreen() {
         {/* Message Input */}
         <View style={styles.inputContainer}>
           <View style={styles.inputWrapper}>
+            <Pressable
+              onPress={() => {
+                setShowMoneyRequestModal(true);
+                loadCategories();
+              }}
+              style={styles.moneyButton}
+            >
+              <Ionicons name="card-outline" size={20} color="#6366f1" />
+            </Pressable>
             <TextInput
               style={styles.textInput}
               placeholder="Nhập tin nhắn..."
@@ -402,6 +930,106 @@ export default function ChatScreen() {
             </Pressable>
           </View>
         </View>
+
+        {/* Money Request Modal */}
+        {showMoneyRequestModal && (
+          <Modal
+            visible={showMoneyRequestModal}
+            animationType="fade"
+            transparent
+            onRequestClose={() => setShowMoneyRequestModal(false)}
+          >
+            <Pressable 
+              style={styles.modalOverlay}
+              onPress={() => setShowMoneyRequestModal(false)}
+            >
+              <Pressable onPress={(e) => e.stopPropagation()}>
+                <ThemedView style={styles.modalContent}>
+                  <View style={styles.modalHeader}>
+                    <ThemedText style={styles.modalTitle}>Yêu cầu thanh toán</ThemedText>
+                    <Pressable onPress={() => setShowMoneyRequestModal(false)}>
+                      <Ionicons name="close" size={24} color="#6b7280" />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.modalBody}>
+                    <ThemedText style={styles.label}>Danh mục</ThemedText>
+                    {loadingCategories ? (
+                      <View style={styles.categoryLoadingContainer}>
+                        <ActivityIndicator size="small" color="#6366f1" />
+                        <ThemedText style={styles.categoryLoadingText}>Đang tải danh mục...</ThemedText>
+                      </View>
+                    ) : (
+                      <View style={styles.categorySelector}>
+                        {categories.map((category) => (
+                          <Pressable
+                            key={category.id}
+                            style={[
+                              styles.categoryItem,
+                              selectedCategory?.id === category.id && styles.categoryItemSelected
+                            ]}
+                            onPress={() => setSelectedCategory(category)}
+                          >
+                            <ThemedText style={styles.categoryEmoji}>{category.emoji || "📝"}</ThemedText>
+                            <ThemedText style={[
+                              styles.categoryName,
+                              selectedCategory?.id === category.id && styles.categoryNameSelected
+                            ]}>
+                              {category.name}
+                            </ThemedText>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+
+                    <ThemedText style={[styles.label, { marginTop: 16 }]}>Số tiền</ThemedText>
+                    <TextInput
+                      style={styles.amountInput}
+                      placeholder="0"
+                      value={requestAmount}
+                      onChangeText={handleAmountChange}
+                      keyboardType="numeric"
+                    />
+                    <ThemedText style={styles.currencyLabel}>VND</ThemedText>
+
+                    <ThemedText style={[styles.label, { marginTop: 16 }]}>Lý do (tùy chọn)</ThemedText>
+                    <TextInput
+                      style={styles.reasonInput}
+                      placeholder="Ví dụ: Tiền ăn trưa, tiền xăng..."
+                      value={requestReason}
+                      onChangeText={setRequestReason}
+                      multiline
+                      maxLength={200}
+                    />
+                  </View>
+
+                  <View style={styles.modalActions}>
+                    <Pressable
+                      onPress={() => setShowMoneyRequestModal(false)}
+                      style={styles.cancelButton}
+                    >
+                      <ThemedText style={styles.cancelButtonText}>Hủy</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={sendMoneyRequest}
+                      disabled={!requestAmount.trim() || !selectedCategory || sendingRequest}
+                      style={[
+                        styles.sendRequestButton,
+                        (!requestAmount.trim() || !selectedCategory || sendingRequest) && styles.sendRequestButtonDisabled
+                      ]}
+                    >
+                      {sendingRequest ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <ThemedText style={styles.sendRequestButtonText}>Gửi yêu cầu</ThemedText>
+                      )}
+                    </Pressable>
+                  </View>
+                </ThemedView>
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -489,16 +1117,27 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     color: "#111827",
   },
+  moneyRequestText: {
+    fontSize: 15,
+    lineHeight: 20,
+    color: "#000000", // Always black for money request content
+    fontWeight: "600",
+  },
   myMessageText: {
     color: "#fff",
+  },
+  myProcessedMessageText: {
+    color: "#065f46", // Dark green text on light green background
   },
   messageTime: {
     fontSize: 11,
     marginTop: 4,
-    color: "#9ca3af",
+    color: "#000000", // Black for better visibility
+    opacity: 0.7,
   },
   myMessageTime: {
-    color: "rgba(255,255,255,0.7)",
+    color: "#000000", // Black instead of white
+    opacity: 0.7,
   },
 
   // Input
@@ -512,6 +1151,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 12,
+  },
+  moneyButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#f0f9ff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#bae6fd",
   },
   textInput: {
     flex: 1,
@@ -534,6 +1183,233 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: "#d1d5db",
+  },
+
+  // Money Request Message Styles
+  moneyRequestBubble: {
+    borderWidth: 2,
+    borderColor: "#6366f1",
+    backgroundColor: "#ffffff", // White background for received requests
+  },
+  processedRequestBubble: {
+    borderColor: "#10b981",
+    backgroundColor: "#ffffff", // White background for processed received requests
+  },
+  myProcessedRequestBubble: {
+    borderColor: "#10b981",
+    backgroundColor: "#d1fae5", // Light green background for my processed requests
+  },
+  moneyRequestHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  moneyRequestLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#000000", // Black text for better visibility
+    textTransform: "uppercase",
+  },
+  myProcessedRequestLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#065f46", // Dark green text on light green background
+    textTransform: "uppercase",
+  },
+  friendRequestLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#000000", // Black text for better visibility
+    textTransform: "uppercase",
+  },
+  moneyRequestActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 12,
+  },
+  processedIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  processedText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#000000", // Black text for better visibility
+  },
+  payButton: {
+    flex: 1,
+    backgroundColor: "#10b981",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  payButtonFull: {
+    width: "100%",
+    backgroundColor: "#10b981",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  payButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+  rejectButton: {
+    flex: 1,
+    backgroundColor: "#ef4444",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  rejectButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  // Money Request Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  modalContent: {
+    width: "100%",
+    maxWidth: 400,
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  modalBody: {
+    marginBottom: 24,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 8,
+    opacity: 0.8,
+  },
+  amountInput: {
+    fontSize: 32,
+    fontWeight: "800",
+    textAlign: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "#6366f1",
+    marginBottom: 8,
+  },
+  currencyLabel: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    color: "#6b7280",
+    marginBottom: 16,
+  },
+  reasonInput: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontWeight: "700",
+    color: "#374151",
+  },
+  sendRequestButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#6366f1",
+    alignItems: "center",
+  },
+  sendRequestButtonDisabled: {
+    backgroundColor: "#d1d5db",
+  },
+  sendRequestButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+  },
+  // Category Selector Styles (moved to avoid duplicate)
+  categorySelector: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 16,
+  },
+  categoryItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+    gap: 6,
+  },
+  categoryItemSelected: {
+    borderColor: "#6366f1",
+    backgroundColor: "#f0f9ff",
+  },
+  categoryEmoji: {
+    fontSize: 16,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  categoryNameSelected: {
+    color: "#6366f1",
+  },
+  categoryLoadingContainer: {  // Renamed to avoid duplicate
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    gap: 8,
+  },
+  categoryLoadingText: {  // Renamed to avoid duplicate
+    color: "#6b7280",
+    fontSize: 14,
   },
 
   // Typing Indicator
