@@ -406,7 +406,7 @@ export default function HomeScreen() {
     <View style={[styles.screen, { backgroundColor: '#fafafa' }]}>
       <FlatList
         data={txs}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: TransactionUI) => item.id}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -429,7 +429,7 @@ export default function HomeScreen() {
                 {/* Notification Button */}
                 <Link href="/tab/notifications" asChild>
                   <Pressable 
-                    style={({ pressed }) => [
+                    style={({ pressed }: { pressed: boolean }) => [
                       styles.notificationButton,
                       pressed && { opacity: 0.7 }
                     ]}
@@ -449,7 +449,7 @@ export default function HomeScreen() {
                 {/* Add Transaction Button */}
                 <Link href="/tab/modal" asChild>
                   <Pressable 
-                    style={({ pressed }) => [
+                    style={({ pressed }: { pressed: boolean }) => [
                       styles.addButton,
                       pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }
                     ]}
@@ -497,8 +497,14 @@ export default function HomeScreen() {
             {/* Budget Alerts */}
             {BudgetAlerts && <BudgetAlerts />}
 
-            {/* Quick Action - Budget Only */}
+            {/* Quick Actions */}
             <View style={styles.quickActions}>
+              <QuickAction 
+                icon="📸" 
+                label="Quét hóa đơn" 
+                href="/scan-receipt"
+                gradient={['#10b981', '#059669']}
+              />
               <QuickAction 
                 icon="🎯" 
                 label="Ngân sách" 
@@ -547,7 +553,7 @@ export default function HomeScreen() {
             </View>
           )
         }
-        renderItem={({ item, index }) => (
+        renderItem={({ item, index }: { item: TransactionUI; index: number }) => (
           <TransactionCard tx={item} index={index} />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -573,7 +579,7 @@ function QuickAction({
   return (
     <Link href={href as any} asChild>
       <Pressable 
-        style={({ pressed }) => [
+        style={({ pressed }: { pressed: boolean }) => [
           styles.actionCard,
           pressed && { opacity: 0.9, transform: [{ scale: 0.95 }] }
         ]}
@@ -597,7 +603,7 @@ function TransactionCard({ tx, index }: { tx: TransactionUI; index: number }) {
   
   return (
     <Pressable 
-      style={({ pressed }) => [
+      style={({ pressed }: { pressed: boolean }) => [
         styles.txCard,
         pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
       ]}

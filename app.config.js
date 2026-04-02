@@ -1,0 +1,75 @@
+module.exports = {
+  expo: {
+    name: "Finly",
+    slug: "Finly",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    scheme: "finly",
+    userInterfaceStyle: "automatic",
+    newArchEnabled: true,
+    keepAwake: false,
+    ios: {
+      supportsTablet: true
+    },
+    android: {
+      adaptiveIcon: {
+        backgroundColor: "#E6F4FE",
+        foregroundImage: "./assets/images/android-icon-foreground.png",
+        backgroundImage: "./assets/images/android-icon-background.png",
+        monochromeImage: "./assets/images/android-icon-monochrome.png"
+      },
+      edgeToEdgeEnabled: true,
+      predictiveBackGestureEnabled: false,
+      package: "com.anonymous.Finly",
+      permissions: [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "READ_MEDIA_VIDEO",
+        "READ_MEDIA_AUDIO",
+        "ACCESS_MEDIA_LOCATION",
+        "CAMERA"
+      ]
+    },
+    web: {
+      output: "static",
+      favicon: "./assets/images/favicon.png"
+    },
+    plugins: [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/images/splash-icon.png",
+          imageWidth: 200,
+          resizeMode: "contain",
+          backgroundColor: "#ffffff",
+          dark: {
+            backgroundColor: "#000000"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          cameraPermission: "Cho phép $(PRODUCT_NAME) truy cập camera để quét hóa đơn."
+        }
+      ]
+    ],
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true
+    },
+    extra: {
+      router: {},
+      eas: {
+        projectId: "aa83d893-6c2a-4d5d-9966-2b00fc7d350f"
+      },
+      // Force load env vars
+      ocrSpaceApiKey: process.env.EXPO_PUBLIC_OCR_SPACE_API_KEY,
+      googleVisionApiKey: process.env.EXPO_PUBLIC_GOOGLE_VISION_API_KEY,
+    }
+  }
+};
