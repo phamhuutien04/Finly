@@ -21,89 +21,6 @@ import { supabase } from "@/lib/supabase";
 const isValidEmail = (email: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-// ✅ danh mục mặc định
-const DEFAULT_CATEGORIES = [
-  // expense
-  { name: "Ăn uống", type: "expense", emoji: "🍜", icon_preset_id: "food", icon_uri: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" },
-  { name: "Cafe", type: "expense", emoji: "☕", icon_preset_id: "coffee", icon_uri: "https://cdn-icons-png.flaticon.com/512/2935/2935414.png" },
-  { name: "Di chuyển", type: "expense", emoji: "🛵", icon_preset_id: "car", icon_uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" },
-  { name: "Mua sắm", type: "expense", emoji: "🛍️", icon_preset_id: "shopping", icon_uri: "https://cdn-icons-png.flaticon.com/512/3081/3081559.png" },
-  { name: "Hóa đơn", type: "expense", emoji: "🧾", icon_preset_id: "bill", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135706.png" },
-  { name: "Khác", type: "expense", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
-
-  // income
-  { name: "Lương", type: "income", emoji: "💵", icon_preset_id: "salary", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" },
-  { name: "Thưởng", type: "income", emoji: "🎁", icon_preset_id: "gift", icon_uri: "https://cdn-icons-png.flaticon.com/512/4202/4202306.png" },
-  { name: "Chuyển khoản", type: "income", emoji: "🏦", icon_preset_id: "bank", icon_uri: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png" },
-  { name: "Khác", type: "income", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
-] as const;
-
-// Flag để tránh tạo trùng
-const seedingUsers = new Set<string>();
-
-async function ensureSeedCategories(userId: string) {
-  console.log('📂 ensureSeedCategories called for user:', userId);
-  
-  // Kiểm tra xem đang seed cho user này không
-  if (seedingUsers.has(userId)) {
-    console.log('⏭️ Already seeding for this user, skipping');
-    return;
-  }
-  
-  try {
-    // Đánh dấu đang seed
-    seedingUsers.add(userId);
-    
-    // 1) Kiểm tra đã có categories chưa
-    const { count, error: countErr } = await supabase
-      .from("categories")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId);
-
-    if (countErr) {
-      console.log("❌ count categories error:", countErr.message);
-      seedingUsers.delete(userId);
-      return;
-    }
-    
-    console.log('📊 Current categories count:', count);
-    
-    if ((count ?? 0) > 0) {
-      console.log('✅ User already has', count, 'categories, skipping seed');
-      seedingUsers.delete(userId);
-      return;
-    }
-
-    // 2) Tạo danh mục mặc định
-    console.log('🌱 Creating default categories...');
-    const payload = DEFAULT_CATEGORIES.map((c) => ({
-      user_id: userId,
-      name: c.name,
-      type: c.type,
-      emoji: c.emoji,
-      icon_uri: c.icon_uri,
-      icon_preset_id: c.icon_preset_id,
-    }));
-
-    console.log('📦 Inserting', payload.length, 'categories');
-    const { error: insErr } = await supabase.from("categories").insert(payload);
-    
-    if (insErr) {
-      console.log("❌ seed categories error:", insErr.message);
-    } else {
-      console.log("✅ Created", payload.length, "default categories");
-    }
-    
-    // Xóa flag sau 5 giây
-    setTimeout(() => {
-      seedingUsers.delete(userId);
-    }, 5000);
-  } catch (err: any) {
-    console.error("❌ Exception in ensureSeedCategories:", err.message);
-    seedingUsers.delete(userId);
-  }
-}
-
 export default function LoginScreen() {
   const router = useRouter();
 
@@ -159,10 +76,7 @@ export default function LoginScreen() {
               if (data.session?.user?.id) {
                 console.log('✅ Session created');
                 
-                // Tạo danh mục
-                await ensureSeedCategories(data.session.user.id);
-                
-                // Redirect
+                // Redirect - danh mục sẽ được tạo ở _layout.tsx
                 router.replace('/(tabs)');
                 return;
               }
@@ -308,9 +222,8 @@ export default function LoginScreen() {
       
       if (result.success) {
         console.log('✅ Google Sign-In successful');
-        Alert.alert('Thành công', 'Đăng nhập bằng Google thành công!', [
-          { text: 'OK', onPress: () => router.replace('/(tabs)') }
-        ]);
+        // Tự động chuyển trang, không cần alert
+        router.replace('/(tabs)');
       } else {
         console.error('❌ Google Sign-In failed:', result.error);
         Alert.alert('Đăng nhập thất bại', result.error || 'Có lỗi xảy ra');

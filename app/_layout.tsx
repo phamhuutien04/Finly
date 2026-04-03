@@ -30,31 +30,71 @@ const DEFAULT_CATEGORIES = [
 ] as const;
 
 async function ensureSeedCategories(userId: string) {
-  // 1) nếu đã có categories rồi thì thôi
-  const { count, error: countErr } = await supabase
-    .from("categories")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
+  console.log('📂 ensureSeedCategories called for user:', userId);
+  
+  try {
+    // 1) Kiểm tra đã có categories chưa với timeout
+    console.log('🔍 Checking existing categories...');
+    
+    const checkPromise = supabase
+      .from("categories")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId);
+    
+    // Timeout sau 5 giây
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Query timeout')), 5000)
+    );
+    
+    const { count, error: countErr } = await Promise.race([
+      checkPromise,
+      timeoutPromise
+    ]) as any;
 
-  if (countErr) {
-    console.log("count categories error:", countErr.message);
-    return;
+    if (countErr) {
+      console.log("❌ count categories error:", countErr.message);
+      // Nếu lỗi, vẫn cố tạo danh mục
+    } else {
+      console.log('📊 Current categories count:', count);
+      
+      if ((count ?? 0) > 0) {
+        console.log('✅ User already has categories, skipping seed');
+        return;
+      }
+    }
+
+    // 2) Tạo danh mục mặc định
+    console.log('🌱 Creating default categories...');
+    const payload = DEFAULT_CATEGORIES.map((c) => ({
+      user_id: userId,
+      name: c.name,
+      type: c.type,
+      emoji: c.emoji,
+      icon_uri: c.icon_uri,
+      icon_preset_id: c.icon_preset_id,
+    }));
+
+    console.log('📦 Inserting', payload.length, 'categories...');
+    
+    const insertPromise = supabase.from("categories").insert(payload);
+    const insertTimeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Insert timeout')), 5000)
+    );
+    
+    const { error: insErr } = await Promise.race([
+      insertPromise,
+      insertTimeoutPromise
+    ]) as any;
+    
+    if (insErr) {
+      console.log("❌ seed categories error:", insErr.message);
+    } else {
+      console.log("✅ Created", payload.length, "default categories!");
+    }
+  } catch (err: any) {
+    console.error("❌ Exception in ensureSeedCategories:", err.message);
+    // Không throw error để không block app
   }
-  if ((count ?? 0) > 0) return;
-
-  // 2) insert seed
-  const payload = DEFAULT_CATEGORIES.map((c) => ({
-    user_id: userId,
-    name: c.name,
-    type: c.type,
-    emoji: c.emoji,
-    icon_uri: c.icon_uri,
-    icon_preset_id: c.icon_preset_id,
-  }));
-
-  const { error: insErr } = await supabase.from("categories").insert(payload);
-  if (insErr) console.log("seed categories error:", insErr.message);
-  else console.log("✅ Created default categories for user");
 }
 
 export default function RootLayout() {
@@ -80,13 +120,20 @@ export default function RootLayout() {
       }
     });
 
-    // Chỉ lắng nghe SIGNED_OUT để redirect về login
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Lắng nghe auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('🔔 Auth event:', _event);
+      
       if (_event === 'SIGNED_OUT') {
         console.log('👋 User signed out');
         router.replace('/auth/login');
+      } else if (_event === 'SIGNED_IN' && session?.user?.id) {
+        console.log('👤 User signed in:', session.user.email);
+        // Tạo danh mục trong background, không chờ
+        ensureSeedCategories(session.user.id).catch(err => {
+          console.error('❌ Failed to seed categories:', err);
+        });
       }
-      // Không xử lý SIGNED_IN ở đây nữa để tránh conflict
     });
 
     return () => {
