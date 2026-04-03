@@ -2,15 +2,15 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, Stack, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    StyleSheet,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  TextInput,
+  View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -19,50 +19,6 @@ import { supabase } from "@/lib/supabase";
 
 const isValidEmail = (email: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-
-// ✅ danh mục mặc định
-const DEFAULT_CATEGORIES = [
-  // expense
-  { name: "Ăn uống", type: "expense", emoji: "🍜", icon_preset_id: "food", icon_uri: "https://cdn-icons-png.flaticon.com/512/3075/3075977.png" },
-  { name: "Cafe", type: "expense", emoji: "☕", icon_preset_id: "coffee", icon_uri: "https://cdn-icons-png.flaticon.com/512/2935/2935414.png" },
-  { name: "Di chuyển", type: "expense", emoji: "🛵", icon_preset_id: "car", icon_uri: "https://cdn-icons-png.flaticon.com/512/744/744465.png" },
-  { name: "Mua sắm", type: "expense", emoji: "🛍️", icon_preset_id: "shopping", icon_uri: "https://cdn-icons-png.flaticon.com/512/3081/3081559.png" },
-  { name: "Hóa đơn", type: "expense", emoji: "🧾", icon_preset_id: "bill", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135706.png" },
-  { name: "Khác", type: "expense", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
-
-  // income
-  { name: "Lương", type: "income", emoji: "💵", icon_preset_id: "salary", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png" },
-  { name: "Thưởng", type: "income", emoji: "🎁", icon_preset_id: "gift", icon_uri: "https://cdn-icons-png.flaticon.com/512/4202/4202306.png" },
-  { name: "Chuyển khoản", type: "income", emoji: "🏦", icon_preset_id: "bank", icon_uri: "https://cdn-icons-png.flaticon.com/512/2830/2830284.png" },
-  { name: "Khác", type: "income", emoji: "📝", icon_preset_id: "other", icon_uri: "https://cdn-icons-png.flaticon.com/512/3135/3135700.png" },
-] as const;
-
-async function ensureSeedCategories(userId: string) {
-  // 1) nếu đã có categories rồi thì thôi
-  const { count, error: countErr } = await supabase
-    .from("categories")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId);
-
-  if (countErr) {
-    console.log("count categories error:", countErr.message);
-    return; // không chặn luồng
-  }
-  if ((count ?? 0) > 0) return;
-
-  // 2) insert seed
-  const payload = DEFAULT_CATEGORIES.map((c) => ({
-    user_id: userId,
-    name: c.name,
-    type: c.type,
-    emoji: c.emoji,
-    icon_uri: c.icon_uri,
-    icon_preset_id: c.icon_preset_id,
-  }));
-
-  const { error: insErr } = await supabase.from("categories").insert(payload);
-  if (insErr) console.log("seed categories error:", insErr.message);
-}
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -148,16 +104,17 @@ export default function RegisterScreen() {
       const user = data.user;
 
       // ✅ Danh mục sẽ được tạo tự động bởi _layout.tsx khi SIGNED_IN
-      Alert.alert("Thành công", "Tạo tài khoản thành công!");
-      router.replace("/auth/login");
-        return;
+      if (data.session) {
+        // Có session ngay => đã đăng nhập
+        Alert.alert("Thành công", "Tạo tài khoản thành công!");
+      } else {
+        // Cần confirm email
+        Alert.alert(
+          "Đăng ký gần xong!",
+          "Bạn hãy kiểm tra email để xác nhận tài khoản. Khi bạn đăng nhập lần đầu, app sẽ tự tạo danh mục mặc định."
+        );
       }
-
-      // ✅ Nếu confirm email => chưa có session => chưa seed được ngay
-      Alert.alert(
-        "Đăng ký gần xong!",
-        "Bạn hãy kiểm tra email để xác nhận tài khoản. Khi bạn đăng nhập lần đầu, app sẽ tự tạo danh mục mặc định."
-      );
+      
       router.replace("/auth/login");
     } catch (err: any) {
       Alert.alert("Lỗi", err?.message ?? "Có lỗi xảy ra.");
