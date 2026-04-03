@@ -1,6 +1,6 @@
-import "react-native-url-polyfill/auto";
 import { createClient } from "@supabase/supabase-js";
 import { Platform } from "react-native";
+import "react-native-url-polyfill/auto";
 
 // Web storage (an toàn cho SSR: chỉ dùng khi có window)
 const webStorage = {
@@ -27,6 +27,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: Platform.OS === "web" ? (webStorage as any) : undefined,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    detectSessionInUrl: false, // ❌ Tắt để xử lý thủ công, tránh conflict
   },
 });

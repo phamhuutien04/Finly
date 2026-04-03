@@ -6,15 +6,15 @@ import { Stack } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  TextInput,
-  View
+    ActivityIndicator,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    TextInput,
+    View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -501,8 +501,22 @@ export default function SettingsScreen() {
             title="Đăng xuất"
             subtitle="Thoát khỏi tài khoản hiện tại"
             onPress={() =>
-              confirmDanger("Đăng xuất", "Bạn muốn đăng xuất?", () => {
-                showSuccess("Đăng xuất", "Đã đăng xuất (demo).");
+              confirmDanger("Đăng xuất", "Bạn muốn đăng xuất?", async () => {
+                try {
+                  // Đăng xuất khỏi Supabase
+                  const { error } = await supabase.auth.signOut();
+                  
+                  if (error) {
+                    showError("Lỗi", "Không thể đăng xuất: " + error.message);
+                    return;
+                  }
+                  
+                  showSuccess("Đăng xuất", "Đã đăng xuất thành công");
+                  
+                  // Router sẽ tự động redirect về login nhờ auth listener trong _layout.tsx
+                } catch (err: any) {
+                  showError("Lỗi", err?.message || "Có lỗi xảy ra");
+                }
               })
             }
           />
