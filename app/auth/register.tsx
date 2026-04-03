@@ -147,11 +147,9 @@ export default function RegisterScreen() {
 
       const user = data.user;
 
-      // ✅ SEED categories (CHỈ khi có session => tức là đã đăng nhập)
-      if (data.session && user?.id) {
-        await ensureSeedCategories(user.id);
-        Alert.alert("Thành công", "Tạo tài khoản + danh mục mặc định thành công!");
-        router.replace("/auth/login");
+      // ✅ Danh mục sẽ được tạo tự động bởi _layout.tsx khi SIGNED_IN
+      Alert.alert("Thành công", "Tạo tài khoản thành công!");
+      router.replace("/auth/login");
         return;
       }
 
