@@ -489,6 +489,30 @@ export default function ProfileScreen() {
     }
   };
 
+  const saveProfile = async () => {
+    if (!editDisplayName.trim() || saving) return;
+    try {
+      setSaving(true);
+      const { error } = await supabase
+        .from("user_profiles")
+        .update({
+          display_name: editDisplayName.trim(),
+          bio: editBio.trim() || null,
+        })
+        .eq("user_id", currentUserId);
+
+      if (error) throw error;
+      
+      showSuccess("Thành công", "Đã cập nhật thông tin!");
+      setShowEditModal(false);
+      await loadProfile();
+    } catch (error: any) {
+      showError("Lỗi", "Không thể cập nhật thông tin");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const getDefaultAvatar = () => {
     return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile?.display_name || 'User') + '&size=200&background=1877f2&color=fff&bold=true';
   };
@@ -680,6 +704,35 @@ export default function ProfileScreen() {
                 </Pressable>
               </View>
             </ThemedView>
+
+            {activeTab === 'about' && (
+              <ThemedView style={styles.aboutSection}>
+                <View style={styles.aboutHeader}>
+                  <ThemedText style={styles.aboutTitle}>Giới thiệu</ThemedText>
+                  {isOwner && (
+                    <Pressable style={styles.editButton} onPress={() => setShowEditModal(true)}>
+                      <Ionicons name="create-outline" size={20} color="#1877f2" />
+                      <ThemedText style={styles.editButtonText}>Chỉnh sửa</ThemedText>
+                    </Pressable>
+                  )}
+                </View>
+                
+                {profile?.bio ? (
+                  <ThemedText style={styles.aboutBio}>{profile.bio}</ThemedText>
+                ) : (
+                  <ThemedText style={styles.aboutEmpty}>
+                    {isOwner ? "Thêm tiểu sử để giới thiệu bản thân" : "Chưa có thông tin giới thiệu"}
+                  </ThemedText>
+                )}
+
+                <View style={styles.aboutInfo}>
+                  <View style={styles.aboutInfoItem}>
+                    <Ionicons name="mail-outline" size={20} color="#65676b" />
+                    <ThemedText style={styles.aboutInfoText}>{profile?.email}</ThemedText>
+                  </View>
+                </View>
+              </ThemedView>
+            )}
           </>
         }
         ListEmptyComponent={
@@ -691,6 +744,58 @@ export default function ProfileScreen() {
           ) : null
         }
       />
+
+      <Modal visible={showEditModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <ThemedView style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>Chỉnh sửa giới thiệu</ThemedText>
+              <Pressable onPress={() => setShowEditModal(false)}>
+                <Ionicons name="close" size={24} color="#6b7280" />
+              </Pressable>
+            </View>
+
+            <View style={styles.editForm}>
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Tên hiển thị</ThemedText>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Nhập tên của bạn"
+                  value={editDisplayName}
+                  onChangeText={setEditDisplayName}
+                  maxLength={50}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <ThemedText style={styles.formLabel}>Tiểu sử</ThemedText>
+                <TextInput
+                  style={[styles.formInput, styles.formTextArea]}
+                  placeholder="Viết vài dòng về bản thân..."
+                  value={editBio}
+                  onChangeText={setEditBio}
+                  multiline
+                  maxLength={200}
+                  textAlignVertical="top"
+                />
+                <ThemedText style={styles.charCount}>{editBio.length}/200</ThemedText>
+              </View>
+            </View>
+
+            <Pressable
+              style={[styles.saveButton, (!editDisplayName.trim() || saving) && styles.saveButtonDisabled]}
+              onPress={saveProfile}
+              disabled={!editDisplayName.trim() || saving}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={styles.saveButtonText}>Lưu thay đổi</ThemedText>
+              )}
+            </Pressable>
+          </ThemedView>
+        </View>
+      </Modal>
 
       <Modal visible={showCommentsModal} animationType="slide" transparent>
         <View style={styles.commentsModalOverlay}>
@@ -1320,6 +1425,104 @@ const styles = StyleSheet.create({
   },
   commentSendButtonDisabled: {
     opacity: 0.5,
+  },
+  aboutSection: {
+    backgroundColor: "#fff",
+    padding: 16,
+    marginBottom: 8,
+  },
+  aboutHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  aboutTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  editButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: "#e7f3ff",
+    borderRadius: 6,
+  },
+  editButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1877f2",
+  },
+  aboutBio: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  aboutEmpty: {
+    fontSize: 15,
+    color: "#65676b",
+    fontStyle: "italic",
+    marginBottom: 16,
+  },
+  aboutInfo: {
+    gap: 12,
+  },
+  aboutInfoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  aboutInfoText: {
+    fontSize: 15,
+    color: "#050505",
+  },
+  editForm: {
+    padding: 16,
+    gap: 20,
+  },
+  formGroup: {
+    gap: 8,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#050505",
+  },
+  formInput: {
+    borderWidth: 1,
+    borderColor: "#e4e6eb",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    backgroundColor: "#fff",
+  },
+  formTextArea: {
+    minHeight: 100,
+    textAlignVertical: "top",
+  },
+  charCount: {
+    fontSize: 12,
+    color: "#65676b",
+    textAlign: "right",
+  },
+  saveButton: {
+    backgroundColor: "#1877f2",
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    margin: 16,
+    marginTop: 0,
+  },
+  saveButtonDisabled: {
+    backgroundColor: "#e4e6eb",
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 15,
   },
   emptyState: {
     padding: 60,
