@@ -2,17 +2,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    StyleSheet,
-    TextInput,
-    View
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -417,8 +417,8 @@ export default function ChatScreen() {
     try {
       setSendingRequest(true);
       
-      // Use the already formatted amount from input
-      const requestContent = `💸 Yêu cầu thanh toán: ${requestAmount} VND${requestReason.trim() ? ` - ${requestReason.trim()}` : ''} (${selectedCategory.name})`;
+      // Include category_id in the message content for accurate tracking
+      const requestContent = `💸 Yêu cầu thanh toán: ${requestAmount} VND${requestReason.trim() ? ` - ${requestReason.trim()}` : ''} (${selectedCategory.name}) [CAT:${selectedCategory.id}]`;
       
       const { data, error } = await supabase
         .from("messages")
@@ -426,7 +426,7 @@ export default function ChatScreen() {
           conversation_id: conversationId,
           sender_id: currentUserId,
           content: requestContent,
-          message_type: 'text'  // Sử dụng 'text' thay vì 'money_request'
+          message_type: 'text'
         })
         .select()
         .single();
@@ -517,17 +517,16 @@ export default function ChatScreen() {
     }
 
     try {
-      // Parse amount and category from message content
-      // Updated regex to handle Vietnamese number format (50.000)
+      // Parse amount, category name, and category_id from message content
       const amountMatch = messageContent.match(/(\d{1,3}(?:\.\d{3})*)\s*VND/);
-      const categoryMatch = messageContent.match(/\(([^)]+)\)$/);
+      const categoryMatch = messageContent.match(/\(([^)]+)\)\s*\[CAT:(\d+)\]/);
       
       console.log('Message content:', messageContent);
       console.log('Amount match:', amountMatch);
       console.log('Category match:', categoryMatch);
       
       if (!amountMatch || !categoryMatch) {
-        showError("Lỗi", "Không thể xử lý yêu cầu thanh toán - không tìm thấy số tiền hoặc danh mục");
+        showError("Lỗi", "Không thể xử lý yêu cầu thanh toán - không tìm thấy thông tin đầy đủ");
         return;
       }
 
@@ -535,12 +534,14 @@ export default function ChatScreen() {
       const amountString = amountMatch[1].replace(/\./g, '');
       const amount = parseInt(amountString, 10);
       const categoryName = categoryMatch[1];
+      const requestCategoryId = parseInt(categoryMatch[2], 10);
       const requesterUserId = userId; // Friend who requested money
 
       console.log('Raw amount string:', amountMatch[1]);
       console.log('Cleaned amount string:', amountString);
       console.log('Parsed amount number:', amount);
       console.log('Category name:', categoryName);
+      console.log('Request category ID:', requestCategoryId);
       console.log('Requester user ID:', requesterUserId);
 
       if (isNaN(amount) || amount <= 0) {
@@ -549,7 +550,7 @@ export default function ChatScreen() {
       }
 
       // Create transactions for both users
-      await createPaymentTransactions(amount, categoryName, requesterUserId, messageId);
+      await createPaymentTransactions(amount, categoryName, requesterUserId, messageId, requestCategoryId);
       
       // Update both local state and processed status immediately
       setProcessedRequests(prev => new Set([...prev, messageId]));
@@ -586,14 +587,14 @@ export default function ChatScreen() {
     }
   };
 
-  const createPaymentTransactions = async (amount: number, categoryName: string, requesterUserId: string, messageId: string) => {
+  const createPaymentTransactions = async (amount: number, categoryName: string, requesterUserId: string, messageId: string, requestCategoryId: number) => {
     // Get current date
     const transactionDate = new Date().toISOString();
 
-    // 1. Tạo giao dịch thu nhập cho người yêu cầu (requester)
-    await createTransactionForUser(requesterUserId, amount, "income", categoryName, `Nhận tiền từ bạn bè`, transactionDate, messageId);
+    // 1. Tạo giao dịch thu nhập cho người yêu cầu (requester) - sử dụng đúng category_id của họ
+    await createTransactionForUser(requesterUserId, amount, "income", categoryName, `Nhận tiền từ bạn bè`, transactionDate, messageId, requestCategoryId);
 
-    // 2. Tạo giao dịch chi tiêu cho người trả tiền (current user)
+    // 2. Tạo giao dịch chi tiêu cho người trả tiền (current user) - tìm hoặc tạo category tương ứng
     await createTransactionForUser(currentUserId!, amount, "expense", categoryName, `Trả tiền cho bạn bè`, transactionDate, messageId);
 
     // 3. Send a status update message to trigger realtime sync (hidden message)
@@ -609,20 +610,26 @@ export default function ChatScreen() {
       });
   };
 
-  const createTransactionForUser = async (userId: string, amount: number, type: "income" | "expense", categoryName: string, note: string, transactionDate: string, messageId: string) => {
+  const createTransactionForUser = async (userId: string, amount: number, type: "income" | "expense", categoryName: string, note: string, transactionDate: string, messageId: string, existingCategoryId?: number) => {
     try {
       console.log(`Creating transaction for user ${userId}:`, {
         amount,
         type,
         categoryName,
         note,
-        messageId
+        messageId,
+        existingCategoryId
       });
 
-      // Find or create category for user
-      let categoryId = await findOrCreateCategory(userId, categoryName, type);
-      
-      console.log(`Found/created category ID: ${categoryId}`);
+      // Use existing category ID if provided, otherwise find or create
+      let categoryId: number;
+      if (existingCategoryId) {
+        categoryId = existingCategoryId;
+        console.log(`Using existing category ID: ${categoryId}`);
+      } else {
+        categoryId = await findOrCreateCategory(userId, categoryName, type);
+        console.log(`Found/created category ID: ${categoryId}`);
+      }
 
       const transactionAmount = Math.abs(amount);
       console.log(`Final transaction amount: ${transactionAmount}`);
@@ -781,7 +788,7 @@ export default function ChatScreen() {
             isMyMessage && isMoneyRequest && isProcessed && styles.myProcessedMessageText, // Dark green for my processed requests
             !isMyMessage && isMoneyRequest && styles.moneyRequestText, // Black text for received money requests
           ]}>
-            {item.content}
+            {item.content.replace(/\s*\[CAT:\d+\]/, '')}
           </ThemedText>
           {isMoneyRequest && !isMyMessage && !isProcessed && (
             <View style={styles.moneyRequestActions}>
