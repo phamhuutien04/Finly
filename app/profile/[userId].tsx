@@ -158,9 +158,9 @@ export default function ProfileScreen() {
         .from("posts")
         .select("*")
         .eq("user_id", userId)
-        .eq("status", "pending")
+        .in("status", ["pending", "approved"])
         .order("created_at", { ascending: false });
-
+      
       if (error) throw error;
 
       const postsWithLikes = await Promise.all(
