@@ -849,7 +849,7 @@ export default function ChatScreen() {
                 {isConnected ? '🟢' : '🔴'}
               </ThemedText>
               <Pressable
-                onPress={() => router.push(`/friend-profile/${userId}` as any)}
+                onPress={() => router.push(`/profile/${userId}` as any)}
                 style={styles.headerButton}
               >
                 <Ionicons name="person-circle-outline" size={28} color="#6366f1" />

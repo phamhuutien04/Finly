@@ -478,7 +478,7 @@ export default function SocialScreen() {
     return (
       <Pressable 
         style={styles.friendCard}
-        onPress={() => router.push(`/friend-profile/${profile.user_id}` as any)}
+        onPress={() => router.push(`/profile/${profile.user_id}` as any)}
       >
         <View style={styles.avatarContainer}>
           {profile.avatar_url ? (
@@ -660,7 +660,7 @@ export default function SocialScreen() {
               </Pressable>
               <Pressable 
                 style={[styles.actionButton, styles.messageButton]}
-                onPress={() => router.push(`/friend-profile/${item.user_id}` as any)}
+                onPress={() => router.push(`/profile/${item.user_id}` as any)}
               >
                 <Ionicons name="person" size={16} color="#1877f2" />
                 <ThemedText style={[styles.buttonText, styles.messageButtonText]}>
@@ -737,11 +737,16 @@ export default function SocialScreen() {
               <Ionicons name="chatbubbles-outline" size={28} color="#6366f1" />
             </Pressable>
           </Link>
-          <Link href="/tab/profile" asChild>
-            <Pressable style={styles.profileButton}>
-              <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
-            </Pressable>
-          </Link>
+          <Pressable 
+            style={styles.profileButton}
+            onPress={() => {
+              if (currentUserId) {
+                router.push(`/profile/${currentUserId}` as any);
+              }
+            }}
+          >
+            <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+          </Pressable>
         </View>
       </View>
 
