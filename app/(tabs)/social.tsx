@@ -2,17 +2,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Dimensions,
-    FlatList,
-    Image,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -58,6 +58,7 @@ export default function SocialScreen() {
   const [requests, setRequests] = useState<Friendship[]>([]);
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -72,6 +73,15 @@ export default function SocialScreen() {
         return;
       }
       setCurrentUserId(user.id);
+
+      // Check if user is admin
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("is_admin")
+        .eq("user_id", user.id)
+        .single();
+
+      setIsAdmin(profile?.is_admin || false);
 
       if (activeTab === "friends") {
         await loadFriends(user.id);
@@ -732,6 +742,14 @@ export default function SocialScreen() {
       <View style={styles.header}>
         <ThemedText style={styles.headerTitle}>Bạn bè</ThemedText>
         <View style={styles.headerButtons}>
+          {isAdmin && (
+            <Pressable 
+              style={styles.adminButton}
+              onPress={() => router.push('/admin/moderate-posts' as any)}
+            >
+              <Ionicons name="shield-checkmark" size={28} color="#ef4444" />
+            </Pressable>
+          )}
           <Link href="/chat/messages" asChild>
             <Pressable style={styles.headerButton}>
               <Ionicons name="chatbubbles-outline" size={28} color="#6366f1" />
@@ -909,6 +927,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   headerButton: {
+    padding: 4,
+  },
+  adminButton: {
     padding: 4,
   },
   profileButton: {
