@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Dimensions,
   Image,
   Modal,
   Platform,
@@ -15,6 +16,8 @@ import {
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Victory setup
 let V: any;
@@ -557,14 +560,15 @@ export default function AnalyticsScreen() {
           </Text>
 
           <VictoryChart
-            height={300}
-            padding={{ top: 20, bottom: 80, left: 60, right: 20 }}
-            domainPadding={{ x: 20 }}
+            width={SCREEN_WIDTH - 64}
+            height={280}
+            padding={{ top: 20, bottom: 70, left: 50, right: 15 }}
+            domainPadding={{ x: 15 }}
           >
             <VictoryAxis
               tickFormat={(t: string) => t}
               style={{
-                tickLabels: { fill: text + 'AA', fontSize: 9, angle: -45, textAnchor: 'end' },
+                tickLabels: { fill: text + 'AA', fontSize: 8, angle: -45, textAnchor: 'end' },
                 axis: { stroke: text + '44' },
               }}
             />
@@ -572,23 +576,23 @@ export default function AnalyticsScreen() {
               dependentAxis
               tickFormat={(t: number) => `${Math.round(t / 1000000)}M`}
               style={{
-                tickLabels: { fill: text + 'AA', fontSize: 9 },
+                tickLabels: { fill: text + 'AA', fontSize: 8 },
                 grid: { stroke: text + '22' },
                 axis: { stroke: text + '44' },
               }}
             />
-            <VictoryGroup offset={18}>
+            <VictoryGroup offset={14}>
               <VictoryBar
                 data={monthlyComparison.map(m => ({ x: m.month, y: m.income }))}
-                cornerRadius={{ top: 4 }}
+                cornerRadius={{ top: 3 }}
                 style={{ data: { fill: tint } }}
-                barWidth={16}
+                barWidth={12}
               />
               <VictoryBar
                 data={monthlyComparison.map(m => ({ x: m.month, y: m.expense }))}
-                cornerRadius={{ top: 4 }}
+                cornerRadius={{ top: 3 }}
                 style={{ data: { fill: '#ef4444' } }}
-                barWidth={16}
+                barWidth={12}
               />
             </VictoryGroup>
           </VictoryChart>
@@ -616,15 +620,15 @@ export default function AnalyticsScreen() {
           <View style={{ alignItems: 'center' }}>
             <VictoryPie
               data={expensePieData}
-              innerRadius={60}
+              innerRadius={55}
               padAngle={2}
-              width={320}
-              height={260}
+              width={SCREEN_WIDTH - 64}
+              height={240}
               labels={(({ datum }: { datum: PieDatum }) => datum.percent > 5 ? `${datum.percent}%` : '')}
-              labelRadius={85}
+              labelRadius={75}
               style={{
                 data: { fill: ({ datum }: { datum: PieDatum }) => datum.fill },
-                labels: { fill: text, fontSize: 12, fontWeight: 'bold' },
+                labels: { fill: text, fontSize: 11, fontWeight: 'bold' },
               }}
             />
           </View>
