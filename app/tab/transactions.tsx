@@ -1,22 +1,22 @@
-import { useRouter } from "expo-router";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  FlatList,
-  Pressable,
-  StyleSheet,
-  View,
-  ActivityIndicator,
-  TextInput,
-  Alert,
-  RefreshControl,
-  Image,
-  Platform,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Platform,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
-import DateTimePicker from "@react-native-community/datetimepicker";
 
-import { supabase } from "@/lib/supabase";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { supabase } from "@/lib/supabase";
 
 type TxType = "income" | "expense" | "all";
 
@@ -258,41 +258,12 @@ export default function AllTransactionsScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <View style={styles.header}>
-        <ThemedText style={styles.title}>Tất cả giao dịch</ThemedText>
-        <ThemedText style={styles.subtitle}>
-          {filteredTxs.length} giao dịch
-          {selectedDate && " (đã lọc)"}
-        </ThemedText>
-        
-        {filteredTxs.length > 0 && (
-          <View style={styles.summaryContainer}>
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryItem}>
-                <ThemedText style={styles.summaryLabel}>Tổng thu</ThemedText>
-                <ThemedText style={[styles.summaryValue, styles.incomeColor]}>
-                  {formatVND(calculateIncome())}
-                </ThemedText>
-              </View>
-              <View style={styles.summaryItem}>
-                <ThemedText style={styles.summaryLabel}>Tổng chi</ThemedText>
-                <ThemedText style={[styles.summaryValue, styles.expenseColor]}>
-                  {formatVND(calculateExpense())}
-                </ThemedText>
-              </View>
-              <View style={styles.summaryItem}>
-                <ThemedText style={styles.summaryLabel}>Số dư</ThemedText>
-                <ThemedText style={[
-                  styles.summaryValue,
-                  calculateTotal() >= 0 ? styles.incomeColor : styles.expenseColor
-                ]}>
-                  {formatVND(calculateTotal())}
-                </ThemedText>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
+      <Stack.Screen options={{ 
+        title: "Tất cả giao dịch",
+        headerStyle: { backgroundColor: '#ffffff' },
+        headerTitleStyle: { fontWeight: '900', fontSize: 20 },
+        headerShadowVisible: false,
+      }} />
 
       <View style={styles.filterContainer}>
         <TextInput
