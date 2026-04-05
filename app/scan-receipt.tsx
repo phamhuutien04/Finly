@@ -2,20 +2,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -42,6 +43,7 @@ export default function ScanReceiptScreen() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+  const [showSuccess, setShowSuccess] = useState(false);
   
   // Form data
   const [amount, setAmount] = useState('');
@@ -206,9 +208,13 @@ export default function ScanReceiptScreen() {
       
       if (error) throw error;
       
-      Alert.alert('Thành công', 'Đã lưu chi tiêu từ hóa đơn', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      setShowConfirm(false);
+      setShowSuccess(true);
+      
+      setTimeout(() => {
+        setShowSuccess(false);
+        router.back();
+      }, 2000);
     } catch (error: any) {
       console.error('Error saving transaction:', error);
       Alert.alert('Lỗi', error.message || 'Không thể lưu giao dịch');
@@ -218,7 +224,8 @@ export default function ScanReceiptScreen() {
   };
   
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <Stack.Screen options={{ headerShown: false }} />
       <CameraView
         ref={cameraRef}
         style={styles.camera}
@@ -349,7 +356,20 @@ export default function ScanReceiptScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+      
+      {/* Modal thành công */}
+      <Modal visible={showSuccess} animationType="fade" transparent>
+        <View style={styles.successModalContainer}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successIconContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="#10b981" />
+            </View>
+            <Text style={styles.successTitle}>Thành công!</Text>
+            <Text style={styles.successMessage}>Đã lưu chi tiêu từ hóa đơn</Text>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -568,5 +588,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  successModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 40,
+    alignItems: 'center',
+    minWidth: 280,
+  },
+  successIconContainer: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#10b981',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#65676b',
+    textAlign: 'center',
   },
 });
