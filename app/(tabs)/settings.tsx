@@ -454,13 +454,6 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        {/* Test Notification - chỉ hiển thị trên mobile */}
-        {Platform.OS !== 'web' && NotificationTest && (
-          <Section title="Test thông báo">
-            <NotificationTest />
-          </Section>
-        )}
-
         <Section title="Dữ liệu">
           <RowPress
             title="Sao lưu dữ liệu"
