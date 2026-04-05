@@ -3,14 +3,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
-  View,
+  View
 } from 'react-native';
 
-import { Picker } from '@react-native-picker/picker';
 
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -64,7 +64,7 @@ interface PieDatum {
 
 // ──────────────────────────────────────────────
 const MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
-const YEARS = ['2024', '2025', '2026', '2027'];
+const YEARS = Array.from({ length: 11 }, (_, i) => String(2020 + i)); // 2020-2030
 
 const PIE_COLORS = [
   '#4F46E5', '#22C55E', '#F97316', '#EF4444', '#06B6D4',
@@ -100,6 +100,9 @@ export default function AnalyticsScreen() {
 
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+  
+  const [showMonthPicker, setShowMonthPicker] = useState(false);
+  const [showYearPicker, setShowYearPicker] = useState(false);
 
   const currentYearMonth = `${selectedYear}-${selectedMonth}`;
 
@@ -421,35 +424,111 @@ export default function AnalyticsScreen() {
         <View style={{ flexDirection: 'row', gap: 12 }}>
           <View style={{ flex: 1 }}>
             <Text style={{ color: text + 'AA', marginBottom: 6 }}>Tháng</Text>
-            <View style={{ borderWidth: 1, borderColor: tint, borderRadius: 12, overflow: 'hidden' }}>
-              <Picker
-                selectedValue={selectedMonth}
-                onValueChange={setSelectedMonth}
-                style={{ color: text, height: 48 }}
-                dropdownIconColor={tint}
-              >
-                {MONTHS.map(m => <Picker.Item key={m} label={m} value={m} />)}
-              </Picker>
-            </View>
+            <Pressable 
+              onPress={() => setShowMonthPicker(true)}
+              style={{ 
+                borderWidth: 1, 
+                borderColor: tint, 
+                borderRadius: 12, 
+                backgroundColor: bg,
+                padding: 14,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: text, fontSize: 16, fontWeight: '600' }}>{selectedMonth}</Text>
+            </Pressable>
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ color: text + 'AA', marginBottom: 6 }}>Năm</Text>
-            <View style={{ borderWidth: 1, borderColor: tint, borderRadius: 12, overflow: 'hidden' }}>
-              <Picker
-                selectedValue={selectedYear}
-                onValueChange={setSelectedYear}
-                style={{ color: text, height: 48 }}
-                dropdownIconColor={tint}
-              >
-                {YEARS.map(y => <Picker.Item key={y} label={y} value={y} />)}
-              </Picker>
-            </View>
+            <Pressable 
+              onPress={() => setShowYearPicker(true)}
+              style={{ 
+                borderWidth: 1, 
+                borderColor: tint, 
+                borderRadius: 12, 
+                backgroundColor: bg,
+                padding: 14,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: text, fontSize: 16, fontWeight: '600' }}>{selectedYear}</Text>
+            </Pressable>
           </View>
         </View>
-        <Text style={{ marginTop: 12, textAlign: 'center', color: tint, fontWeight: '700' }}>
-          {currentYearMonth}
-        </Text>
       </View>
+
+      {/* Modal chọn tháng */}
+      <Modal visible={showMonthPicker} transparent animationType="fade">
+        <Pressable 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setShowMonthPicker(false)}
+        >
+          <View style={{ backgroundColor: card, borderRadius: 20, padding: 20, width: '80%', maxWidth: 300 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: text, marginBottom: 16, textAlign: 'center' }}>
+              Chọn tháng
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {MONTHS.map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    setSelectedMonth(m);
+                    setShowMonthPicker(false);
+                  }}
+                  style={{
+                    width: '30%',
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: selectedMonth === m ? tint : bg,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: selectedMonth === m ? '#fff' : text, fontWeight: '700' }}>
+                    {m}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Modal chọn năm */}
+      <Modal visible={showYearPicker} transparent animationType="fade">
+        <Pressable 
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }}
+          onPress={() => setShowYearPicker(false)}
+        >
+          <View style={{ backgroundColor: card, borderRadius: 20, padding: 20, width: '80%', maxWidth: 300, maxHeight: '70%' }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: text, marginBottom: 16, textAlign: 'center' }}>
+              Chọn năm
+            </Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={{ gap: 10 }}>
+                {YEARS.map(y => (
+                  <Pressable
+                    key={y}
+                    onPress={() => {
+                      setSelectedYear(y);
+                      setShowYearPicker(false);
+                    }}
+                    style={{
+                      padding: 14,
+                      borderRadius: 12,
+                      backgroundColor: selectedYear === y ? tint : bg,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: selectedYear === y ? '#fff' : text, fontWeight: '700', fontSize: 16 }}>
+                      {y}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Cards */}
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
@@ -478,14 +557,14 @@ export default function AnalyticsScreen() {
           </Text>
 
           <VictoryChart
-            height={340}
-            padding={{ top: 30, bottom: 110, left: 80, right: 30 }}
-            domainPadding={{ x: 30 }}
+            height={300}
+            padding={{ top: 20, bottom: 80, left: 60, right: 20 }}
+            domainPadding={{ x: 20 }}
           >
             <VictoryAxis
               tickFormat={(t: string) => t}
               style={{
-                tickLabels: { fill: text + 'AA', fontSize: 10, angle: -45 },
+                tickLabels: { fill: text + 'AA', fontSize: 9, angle: -45, textAnchor: 'end' },
                 axis: { stroke: text + '44' },
               }}
             />
@@ -493,23 +572,23 @@ export default function AnalyticsScreen() {
               dependentAxis
               tickFormat={(t: number) => `${Math.round(t / 1000000)}M`}
               style={{
-                tickLabels: { fill: text + 'AA', fontSize: 10 },
+                tickLabels: { fill: text + 'AA', fontSize: 9 },
                 grid: { stroke: text + '22' },
                 axis: { stroke: text + '44' },
               }}
             />
-            <VictoryGroup offset={24}>
+            <VictoryGroup offset={18}>
               <VictoryBar
                 data={monthlyComparison.map(m => ({ x: m.month, y: m.income }))}
-                cornerRadius={{ top: 6 }}
+                cornerRadius={{ top: 4 }}
                 style={{ data: { fill: tint } }}
-                barWidth={20}
+                barWidth={16}
               />
               <VictoryBar
                 data={monthlyComparison.map(m => ({ x: m.month, y: m.expense }))}
-                cornerRadius={{ top: 6 }}
+                cornerRadius={{ top: 4 }}
                 style={{ data: { fill: '#ef4444' } }}
-                barWidth={20}
+                barWidth={16}
               />
             </VictoryGroup>
           </VictoryChart>
@@ -537,15 +616,15 @@ export default function AnalyticsScreen() {
           <View style={{ alignItems: 'center' }}>
             <VictoryPie
               data={expensePieData}
-              innerRadius={70}
-              padAngle={3}
-              width={340}
-              height={280}
+              innerRadius={60}
+              padAngle={2}
+              width={320}
+              height={260}
               labels={(({ datum }: { datum: PieDatum }) => datum.percent > 5 ? `${datum.percent}%` : '')}
-              labelRadius={95}
+              labelRadius={85}
               style={{
                 data: { fill: ({ datum }: { datum: PieDatum }) => datum.fill },
-                labels: { fill: text, fontSize: 13, fontWeight: 'bold' },
+                labels: { fill: text, fontSize: 12, fontWeight: 'bold' },
               }}
             />
           </View>
