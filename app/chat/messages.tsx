@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Link, useRouter } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -280,23 +280,27 @@ export default function MessagesScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <Stack.Screen options={{ headerShown: false }} />
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <ThemedText style={styles.headerTitle}>Tin nhắn</ThemedText>
-          {/* Realtime status indicator */}
-          <View style={styles.realtimeStatus}>
-            <View style={[styles.realtimeDot, currentUserId && styles.realtimeDotActive]} />
-            <ThemedText style={styles.realtimeText}>
-              {currentUserId ? 'Realtime' : 'Offline'}
-            </ThemedText>
-          </View>
-        </View>
-        <Link href="/tab/profile" asChild>
-          <Pressable style={styles.profileButton}>
-            <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
-          </Pressable>
-        </Link>
+        <Pressable 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </Pressable>
+        <ThemedText style={styles.headerTitle}>Tin nhắn</ThemedText>
+        <Pressable 
+          style={styles.profileButton}
+          onPress={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              router.push(`/profile/${user.id}` as any);
+            }
+          }}
+        >
+          <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+        </Pressable>
       </View>
 
       {/* Conversations List */}
@@ -347,33 +351,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
   },
-  headerLeft: {
-    flex: 1,
+  backButton: {
+    padding: 4,
+    marginRight: 12,
   },
   headerTitle: {
     fontSize: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
     fontWeight: "900",
     letterSpacing: -1,
-    marginBottom: 4,
-  },
-  realtimeStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  realtimeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#9ca3af",
-  },
-  realtimeDotActive: {
-    backgroundColor: "#22c55e",
-  },
-  realtimeText: {
-    fontSize: 12,
-    color: "#6b7280",
-    fontWeight: "600",
+    flex: 1,
   },
   profileButton: {
     padding: 4,
