@@ -2,16 +2,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  Share,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    Modal,
+    Pressable,
+    Share,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,9 +41,7 @@ type Comment = {
   user_id: string;
   parent_comment_id: number | null;
   content: string;
-  likes_count: number;
   created_at: string;
-  user_liked?: boolean;
   user_display_name?: string;
   user_avatar_url?: string;
 };
@@ -266,24 +264,10 @@ export default function ProfileScreen() {
             .eq("user_id", comment.user_id)
             .single();
 
-          const { data: likeData } = await supabase
-            .from("comment_likes")
-            .select("id")
-            .eq("comment_id", comment.id)
-            .eq("user_id", currentUserId)
-            .single();
-
-          const { count: likesCount } = await supabase
-            .from("comment_likes")
-            .select("*", { count: "exact", head: true })
-            .eq("comment_id", comment.id);
-
           return {
             ...comment,
             user_display_name: profileData?.display_name || "User",
             user_avatar_url: profileData?.avatar_url,
-            likes_count: likesCount || 0,
-            user_liked: !!likeData,
           };
         })
       );
@@ -324,27 +308,6 @@ export default function ProfileScreen() {
     }
   };
 
-  const toggleLikeComment = async (comment: Comment) => {
-    try {
-      if (comment.user_liked) {
-        await supabase
-          .from("comment_likes")
-          .delete()
-          .eq("comment_id", comment.id)
-          .eq("user_id", currentUserId);
-      } else {
-        await supabase
-          .from("comment_likes")
-          .insert({ comment_id: comment.id, user_id: currentUserId });
-      }
-      if (selectedPost) {
-        await loadComments(selectedPost.id);
-      }
-    } catch (error: any) {
-      console.error("Error toggling comment like:", error);
-    }
-  };
-
   const getCommentAvatar = (avatarUrl?: string, displayName?: string) => {
     if (avatarUrl) return avatarUrl;
     return 'https://ui-avatars.com/api/?name=' + encodeURIComponent(displayName || 'User') + '&size=80&background=1877f2&color=fff&bold=true';
@@ -352,7 +315,6 @@ export default function ProfileScreen() {
 
   const renderComment = (comment: Comment) => {
     const isReply = !!comment.parent_comment_id;
-    const replies = comments.filter(c => c.parent_comment_id === comment.id);
 
     return (
       <View key={comment.id} style={[styles.commentItem, isReply && styles.commentReply]}>
@@ -366,25 +328,9 @@ export default function ProfileScreen() {
             <ThemedText style={styles.commentText}>{comment.content}</ThemedText>
           </View>
           <View style={styles.commentActions}>
-            <Pressable onPress={() => toggleLikeComment(comment)}>
-              <ThemedText style={[styles.commentAction, comment.user_liked && styles.commentActionLiked]}>
-                Thích
-              </ThemedText>
+            <Pressable onPress={() => setReplyingTo(comment)}>
+              <ThemedText style={styles.commentAction}>Trả lời</ThemedText>
             </Pressable>
-            {comment.likes_count > 0 && (
-              <>
-                <ThemedText style={styles.commentActionDot}> · </ThemedText>
-                <ThemedText style={styles.commentLikeCount}>{comment.likes_count}</ThemedText>
-              </>
-            )}
-            {!isReply && (
-              <>
-                <ThemedText style={styles.commentActionDot}> · </ThemedText>
-                <Pressable onPress={() => setReplyingTo(comment)}>
-                  <ThemedText style={styles.commentAction}>Trả lời</ThemedText>
-                </Pressable>
-              </>
-            )}
             <ThemedText style={styles.commentActionDot}> · </ThemedText>
             <ThemedText style={styles.commentTime}>
               {new Date(comment.created_at).toLocaleDateString('vi-VN')}
@@ -396,14 +342,24 @@ export default function ProfileScreen() {
   };
 
   const renderCommentWithReplies = (comment: Comment) => {
-    if (comment.parent_comment_id) return null; // Skip replies, they'll be rendered with their parent
+    if (comment.parent_comment_id) return null;
     
-    const replies = comments.filter(c => c.parent_comment_id === comment.id);
+    // Lấy tất cả reply (bao gồm cả reply của reply)
+    const allReplies = comments.filter(c => c.parent_comment_id === comment.id);
     
     return (
       <View key={comment.id}>
         {renderComment(comment)}
-        {replies.map(reply => renderComment(reply))}
+        {allReplies.map(reply => {
+          // Render reply
+          const nestedReplies = comments.filter(c => c.parent_comment_id === reply.id);
+          return (
+            <View key={reply.id}>
+              {renderComment(reply)}
+              {nestedReplies.map(nested => renderComment(nested))}
+            </View>
+          );
+        })}
       </View>
     );
   };
@@ -1368,17 +1324,10 @@ const styles = StyleSheet.create({
     color: "#65676b",
     fontWeight: "600",
   },
-  commentActionLiked: {
-    color: "#1877f2",
-  },
   commentActionDot: {
     fontSize: 12,
     color: "#65676b",
     marginHorizontal: 4,
-  },
-  commentLikeCount: {
-    fontSize: 12,
-    color: "#65676b",
   },
   commentTime: {
     fontSize: 12,
