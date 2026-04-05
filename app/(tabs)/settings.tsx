@@ -589,77 +589,87 @@ export default function SettingsScreen() {
       {showExportModal && (
         <Modal
           visible={showExportModal}
-          animationType="fade"
+          animationType="slide"
           transparent
           onRequestClose={() => setShowExportModal(false)}
         >
           <Pressable 
-            style={styles.editModalOverlay}
-            onPress={() => setShowExportModal(false)}
+            style={styles.exportModalOverlay}
+            onPress={() => {
+              setShowExportModal(false);
+              setExportType(null);
+            }}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
-              <ThemedView style={styles.editModalContent}>
-                <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
-                  Xuất dữ liệu
-                </ThemedText>
-
-                <ThemedText style={styles.label}>Chọn loại giao dịch</ThemedText>
+              <ThemedView style={styles.exportModalContent}>
+                <View style={styles.exportModalHandle} />
                 
-                <Pressable
-                  onPress={() => setExportType('income')}
-                  style={[
-                    styles.optionBtn,
-                    exportType === 'income' && styles.optionBtnSelected
-                  ]}
-                >
-                  <View style={styles.radioOuter}>
-                    {exportType === 'income' && <View style={styles.radioInner} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.optionTitle}>Thu nhập</ThemedText>
-                    <ThemedText style={styles.optionSubtitle}>Xuất tất cả giao dịch thu nhập</ThemedText>
-                  </View>
-                </Pressable>
+                <ThemedText style={styles.exportModalTitle}>Xuất dữ liệu</ThemedText>
+                <ThemedText style={styles.exportModalSubtitle}>Chọn loại giao dịch</ThemedText>
+                
+                <View style={styles.exportOptionsContainer}>
+                  <Pressable
+                    onPress={() => setExportType('income')}
+                    style={[
+                      styles.exportOptionCard,
+                      exportType === 'income' && styles.exportOptionCardSelected
+                    ]}
+                  >
+                    <View style={[styles.exportOptionIcon, { backgroundColor: '#10B981' }]}>
+                      <ThemedText style={styles.exportOptionEmoji}>💰</ThemedText>
+                    </View>
+                    <ThemedText style={styles.exportOptionTitle}>Thu nhập</ThemedText>
+                    <ThemedText style={styles.exportOptionDesc}>Xuất tất cả giao dịch</ThemedText>
+                    {exportType === 'income' && (
+                      <View style={styles.exportCheckmark}>
+                        <ThemedText style={styles.exportCheckmarkText}>✓</ThemedText>
+                      </View>
+                    )}
+                  </Pressable>
 
-                <Pressable
-                  onPress={() => setExportType('expense')}
-                  style={[
-                    styles.optionBtn,
-                    exportType === 'expense' && styles.optionBtnSelected
-                  ]}
-                >
-                  <View style={styles.radioOuter}>
-                    {exportType === 'expense' && <View style={styles.radioInner} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <ThemedText style={styles.optionTitle}>Chi tiêu</ThemedText>
-                    <ThemedText style={styles.optionSubtitle}>Xuất tất cả giao dịch chi tiêu</ThemedText>
-                  </View>
-                </Pressable>
+                  <Pressable
+                    onPress={() => setExportType('expense')}
+                    style={[
+                      styles.exportOptionCard,
+                      exportType === 'expense' && styles.exportOptionCardSelected
+                    ]}
+                  >
+                    <View style={[styles.exportOptionIcon, { backgroundColor: '#EF4444' }]}>
+                      <ThemedText style={styles.exportOptionEmoji}>💸</ThemedText>
+                    </View>
+                    <ThemedText style={styles.exportOptionTitle}>Chi tiêu</ThemedText>
+                    <ThemedText style={styles.exportOptionDesc}>Xuất tất cả giao dịch</ThemedText>
+                    {exportType === 'expense' && (
+                      <View style={styles.exportCheckmark}>
+                        <ThemedText style={styles.exportCheckmarkText}>✓</ThemedText>
+                      </View>
+                    )}
+                  </Pressable>
+                </View>
 
-                <View style={styles.editModalActions}>
+                <View style={styles.exportModalActions}>
                   <Pressable
                     onPress={() => {
                       setShowExportModal(false);
                       setExportType(null);
                     }}
-                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [styles.exportCancelBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                    <ThemedText style={styles.exportCancelBtnText}>Huỷ</ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={exportTransactions}
                     disabled={!exportType || exportLoading}
                     style={({ pressed }) => [
-                      styles.saveBtn,
-                      (!exportType || exportLoading) && styles.saveBtnDisabled,
+                      styles.exportDownloadBtn,
+                      (!exportType || exportLoading) && styles.exportDownloadBtnDisabled,
                       pressed && { opacity: 0.7 }
                     ]}
                   >
                     {exportLoading ? (
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
-                      <ThemedText style={styles.saveBtnText}>📥 Tải xuống</ThemedText>
+                      <ThemedText style={styles.exportDownloadBtnText}>📥 Tải xuống</ThemedText>
                     )}
                   </Pressable>
                 </View>
@@ -939,7 +949,155 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
 
-  // Export modal
+  // Export modal - new design
+  exportModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  exportModalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 8,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+  },
+  exportModalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: 'rgba(127,127,127,0.3)',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  exportModalTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  exportModalSubtitle: {
+    fontSize: 14,
+    opacity: 0.6,
+    textAlign: 'center',
+    marginBottom: 24,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    fontWeight: '600',
+  },
+  exportOptionsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  exportOptionCard: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  exportOptionCardSelected: {
+    borderColor: '#3B82F6',
+    backgroundColor: '#EFF6FF',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  exportOptionIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  exportOptionEmoji: {
+    fontSize: 32,
+  },
+  exportOptionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  exportOptionDesc: {
+    fontSize: 12,
+    opacity: 0.6,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  exportCheckmark: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  exportCheckmarkText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  exportModalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  exportCancelBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+  },
+  exportCancelBtnText: {
+    fontWeight: '700',
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  exportDownloadBtn: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
+    alignItems: 'center',
+    shadowColor: '#3B82F6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  exportDownloadBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  exportDownloadBtnDisabled: {
+    backgroundColor: '#D1D5DB',
+    shadowOpacity: 0,
+  },
+
+  // Old export modal styles (keep for edit profile modal)
   optionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
