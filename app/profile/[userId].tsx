@@ -595,7 +595,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={styles.screen} edges={['bottom']}>
       <Stack.Screen options={{ title: profile?.display_name || "Hồ sơ" }} />
 
       <FlatList
@@ -898,7 +898,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#f0f2f5",
+    backgroundColor: "#fff",
   },
   loadingContainer: {
     flex: 1,
@@ -907,7 +907,7 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     backgroundColor: "#fff",
-    marginBottom: 8,
+    marginBottom: 0,
   },
   coverPhoto: {
     width: "100%",
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#e4e6eb",
-    marginBottom: 8,
+    marginBottom: 0,
   },
   tabs: {
     flexDirection: "row",
@@ -1020,7 +1020,9 @@ const styles = StyleSheet.create({
   },
   postCard: {
     backgroundColor: "#fff",
-    marginBottom: 8,
+    marginBottom: 0,
+    borderBottomWidth: 8,
+    borderBottomColor: "#f0f2f5",
   },
   postHeader: {
     flexDirection: "row",
@@ -1379,7 +1381,9 @@ const styles = StyleSheet.create({
   aboutSection: {
     backgroundColor: "#fff",
     padding: 16,
-    marginBottom: 8,
+    marginBottom: 0,
+    borderBottomWidth: 8,
+    borderBottomColor: "#f0f2f5",
   },
   aboutHeader: {
     flexDirection: "row",
@@ -1478,8 +1482,8 @@ const styles = StyleSheet.create({
     padding: 60,
     alignItems: "center",
     backgroundColor: "#fff",
-    borderRadius: 8,
-    margin: 16,
+    borderRadius: 0,
+    margin: 0,
   },
   emptyText: {
     fontSize: 17,

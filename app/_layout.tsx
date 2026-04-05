@@ -2,11 +2,15 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { LogBox } from 'react-native';
 import 'react-native-reanimated';
 
 import GlobalAlertProvider from '@/components/GlobalAlertProvider';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
+
+// Tắt tất cả warnings và errors trên màn hình
+LogBox.ignoreAllLogs(true);
 
 export const unstable_settings = {
   anchor: '(tabs)',
