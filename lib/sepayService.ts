@@ -374,50 +374,29 @@ export async function syncSepayTransactions(): Promise<{
           date: tx.transaction_date,
         });
 
-        // Kiểm tra giao dịch đã sync chưa (dùng bảng tracking)
-        console.log(`🔍 Checking if Sepay transaction ${tx.id} already synced`);
+        // Kiểm tra giao dịch đã sync chưa (check trong bảng transactions)
+        console.log(`🔍 Checking if Sepay transaction ${tx.id} already exists in transactions table`);
         
-        const { data: syncedRecord, error: checkError } = await supabase
-          .from('sepay_synced_transactions')
+        const { data: existingTx, error: checkError } = await supabase
+          .from('transactions')
           .select('id')
           .eq('user_id', user.id)
           .eq('sepay_transaction_id', tx.id.toString())
           .maybeSingle();
 
         if (checkError) {
-          console.error('❌ Error checking sync status:', checkError);
+          console.error('❌ Error checking transaction:', checkError);
           errors++;
           continue;
         }
 
-        if (syncedRecord) {
-          console.log(`⏭️  Transaction ${tx.id} already synced, skipping`);
+        if (existingTx) {
+          console.log(`⏭️  Transaction ${tx.id} already exists, skipping`);
           skipped++;
           continue;
         }
         
         console.log(`✨ Transaction ${tx.id} is new, will create it`);
-
-        // Lưu vào bảng tracking TRƯỚC để tránh race condition
-        const { error: preTrackError } = await supabase
-          .from('sepay_synced_transactions')
-          .insert({
-            user_id: user.id,
-            sepay_transaction_id: tx.id.toString(),
-            transaction_id: null, // Tạm thời null, sẽ update sau
-          });
-        
-        if (preTrackError) {
-          // Nếu lỗi unique constraint = đã sync rồi
-          if (preTrackError.code === '23505') {
-            console.log(`⏭️  Transaction ${tx.id} already being synced, skipping`);
-            skipped++;
-            continue;
-          }
-          console.error('❌ Error pre-tracking:', preTrackError);
-          errors++;
-          continue;
-        }
 
         // Phát hiện danh mục từ nội dung
         const detectedCategoryName = detectCategory(tx.transaction_content || '');
@@ -427,7 +406,7 @@ export async function syncSepayTransactions(): Promise<{
         const categoryId = await findOrCreateCategory(user.id, detectedCategoryName, type);
         console.log(`📁 Category ID: ${categoryId}`);
 
-        // Tạo giao dịch mới (chỉ lưu tên, không có prefix Sepay)
+        // Tạo giao dịch mới (lưu sepay_transaction_id để check trùng)
         const noteContent = tx.transaction_content || 'Giao dịch ngân hàng';
         
         const { data: newTx, error: insertError } = await supabase
@@ -440,29 +419,16 @@ export async function syncSepayTransactions(): Promise<{
             note: noteContent,
             transaction_date: tx.transaction_date,
             occurred_at: tx.transaction_date,
+            sepay_transaction_id: tx.id.toString(), // Lưu ID để check trùng
           })
           .select()
           .single();
 
         if (insertError) {
           console.error('❌ Error inserting transaction:', insertError);
-          // Xóa record tracking vì tạo transaction thất bại
-          await supabase
-            .from('sepay_synced_transactions')
-            .delete()
-            .eq('user_id', user.id)
-            .eq('sepay_transaction_id', tx.id.toString());
           errors++;
         } else {
           console.log(`✅ Transaction created successfully:`, newTx);
-          
-          // Update transaction_id vào tracking record
-          await supabase
-            .from('sepay_synced_transactions')
-            .update({ transaction_id: newTx.id })
-            .eq('user_id', user.id)
-            .eq('sepay_transaction_id', tx.id.toString());
-          
           synced++;
         }
       } catch (err) {
