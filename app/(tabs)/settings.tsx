@@ -1,20 +1,21 @@
 import { saveToDownloads } from '@/lib/DownloadModule';
+import { syncSepayTransactions } from '@/lib/sepayService';
 import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as Sharing from 'expo-sharing';
 import React, { useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    TextInput,
-    View
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  TextInput,
+  View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -44,6 +45,7 @@ type User = {
 };
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const [darkMode, setDarkMode] = useState(false);
   const [biometric, setBiometric] = useState(false);
   const [pushNoti, setPushNoti] = useState(true);
@@ -63,6 +65,12 @@ export default function SettingsScreen() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportType, setExportType] = useState<'income' | 'expense' | null>(null);
   const [exportLoading, setExportLoading] = useState(false);
+
+  // Sepay API key states
+  const [showSepayModal, setShowSepayModal] = useState(false);
+  const [sepayApiKey, setSepayApiKey] = useState('');
+  const [savingSepayKey, setSavingSepayKey] = useState(false);
+  const [syncingSepay, setSyncingSepay] = useState(false);
 
   const languages: Option[] = useMemo(
     () => [
@@ -109,6 +117,7 @@ export default function SettingsScreen() {
   // Load current user profile
   React.useEffect(() => {
     loadCurrentUserProfile();
+    loadSepayApiKey();
   }, []);
 
   const loadCurrentUserProfile = async () => {
@@ -131,6 +140,139 @@ export default function SettingsScreen() {
       console.error('Error loading profile:', error);
     } finally {
       setLoadingProfile(false);
+    }
+  };
+
+  // Load Sepay API key
+  const loadSepayApiKey = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Lấy từ bảng user_profiles
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('sepay_api_key')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        console.error('Error loading Sepay key:', error);
+        return;
+      }
+
+      if (data?.sepay_api_key) {
+        setSepayApiKey(data.sepay_api_key);
+      }
+    } catch (error) {
+      console.error('Error loading Sepay key:', error);
+    }
+  };
+
+  // Save Sepay API key
+  const saveSepayApiKey = async () => {
+    if (!sepayApiKey.trim()) {
+      showWarning('Lỗi', 'Vui lòng nhập API key');
+      return;
+    }
+
+    setSavingSepayKey(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        showError('Lỗi', 'Vui lòng đăng nhập');
+        return;
+      }
+
+      // Lưu vào bảng user_profiles (trigger sẽ tự động cập nhật sepay_key_created_at)
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          sepay_api_key: sepayApiKey.trim(),
+        })
+        .eq('user_id', user.id);
+
+      if (error) {
+        showError('Lỗi', 'Không thể lưu API key: ' + error.message);
+        return;
+      }
+
+      setShowSepayModal(false);
+      showSuccess('Thành công', 'Đã lưu Sepay API key');
+    } catch (err: any) {
+      showError('Lỗi', err.message);
+    } finally {
+      setSavingSepayKey(false);
+    }
+  };
+
+  // Remove Sepay API key
+  const removeSepayApiKey = async () => {
+    confirmDanger(
+      'Xoá API key',
+      'Bạn có chắc muốn xoá API key?',
+      async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            showError('Lỗi', 'Vui lòng đăng nhập');
+            return;
+          }
+
+          // Xoá khỏi bảng user_profiles (trigger sẽ tự động xoá sepay_key_created_at)
+          const { error } = await supabase
+            .from('user_profiles')
+            .update({
+              sepay_api_key: null,
+            })
+            .eq('user_id', user.id);
+
+          if (error) {
+            showError('Lỗi', 'Không thể xoá API key: ' + error.message);
+            return;
+          }
+
+          setSepayApiKey('');
+          showSuccess('Thành công', 'Đã xoá API key');
+        } catch (err: any) {
+          showError('Lỗi', err.message);
+        }
+      }
+    );
+  };
+
+  // Đồng bộ giao dịch từ Sepay
+  const handleSyncSepay = async () => {
+    if (!sepayApiKey) {
+      showWarning('Lỗi', 'Vui lòng cài đặt API key trước');
+      return;
+    }
+
+    setSyncingSepay(true);
+    try {
+      const result = await syncSepayTransactions();
+      
+      if (result.success) {
+        if (result.synced > 0) {
+          showSuccess(
+            'Đồng bộ thành công', 
+            `${result.message}\n\nĐang chuyển về trang chủ...`
+          );
+          
+          // Đợi 1.5s rồi chuyển về trang chủ để reload dữ liệu
+          setTimeout(() => {
+            router.push('/(tabs)');
+          }, 1500);
+        } else {
+          showInfo('Thông báo', result.message);
+        }
+      } else {
+        showError('Lỗi', result.message);
+      }
+    } catch (err: any) {
+      showError('Lỗi', err.message || 'Không thể đồng bộ');
+    } finally {
+      setSyncingSepay(false);
     }
   };
 
@@ -454,6 +596,28 @@ export default function SettingsScreen() {
           />
         </Section>
 
+        <Section title="Tích hợp API">
+          <RowPress
+            title="API Key"
+            subtitle={sepayApiKey ? '••••••••' + sepayApiKey.slice(-4) : 'Chưa cài đặt'}
+            onPress={() => setShowSepayModal(true)}
+          />
+          {sepayApiKey && (
+            <>
+              <RowPress
+                title="Đồng bộ giao dịch ngân hàng"
+                subtitle="Tự động phân loại chi tiêu"
+                onPress={handleSyncSepay}
+              />
+              <RowDanger
+                title="Xoá API Key"
+                subtitle="Xoá key đã lưu"
+                onPress={removeSepayApiKey}
+              />
+            </>
+          )}
+        </Section>
+
         <Section title="Dữ liệu">
           <RowPress
             title="Sao lưu dữ liệu"
@@ -577,6 +741,70 @@ export default function SettingsScreen() {
                     style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.7 }]}
                   >
                     <ThemedText style={styles.saveBtnText}>Lưu</ThemedText>
+                  </Pressable>
+                </View>
+              </ThemedView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* Sepay API Key Modal */}
+      {showSepayModal && (
+        <Modal
+          visible={showSepayModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowSepayModal(false)}
+        >
+          <Pressable 
+            style={styles.editModalOverlay}
+            onPress={() => setShowSepayModal(false)}
+          >
+            <Pressable onPress={(e) => e.stopPropagation()}>
+              <ThemedView style={styles.editModalContent}>
+                <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
+                  Cài đặt Sepay API Key
+                </ThemedText>
+                <ThemedText style={[styles.helperText, { marginTop: 0, marginBottom: 16 }]}>
+                  Nhập API key từ Sepay để tự động đồng bộ giao dịch ngân hàng
+                </ThemedText>
+
+                <ThemedText style={styles.label}>API Key</ThemedText>
+                <TextInput
+                  style={styles.input}
+                  value={sepayApiKey}
+                  onChangeText={setSepayApiKey}
+                  placeholder="Nhập Sepay API key"
+                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <ThemedText style={styles.helperText}>
+                  Lấy API key tại: https://my.sepay.vn
+                </ThemedText>
+
+                <View style={styles.editModalActions}>
+                  <Pressable
+                    onPress={() => setShowSepayModal(false)}
+                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={saveSepayApiKey}
+                    disabled={savingSepayKey}
+                    style={({ pressed }) => [
+                      styles.saveBtn,
+                      savingSepayKey && styles.saveBtnDisabled,
+                      pressed && { opacity: 0.7 }
+                    ]}
+                  >
+                    {savingSepayKey ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <ThemedText style={styles.saveBtnText}>Lưu</ThemedText>
+                    )}
                   </Pressable>
                 </View>
               </ThemedView>

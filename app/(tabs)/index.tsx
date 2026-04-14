@@ -7,6 +7,7 @@ import {
   Dimensions,
   FlatList,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -17,6 +18,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useSepayAutoSync } from "@/hooks/useSepayAutoSync";
 import { setGlobalAlertFunction } from "@/lib/budgetNotification";
 import { supabase } from "@/lib/supabase";
 
@@ -99,6 +101,19 @@ export default function HomeScreen() {
   const router = useRouter();
   const { showAlert, AlertComponent } = useBudgetAlert();
   const { unreadCount } = useNotifications();
+  
+  // Tự động đồng bộ Sepay mỗi 15 giây
+  const { isSyncing: isSyncingSepay, lastSyncTime, syncStats } = useSepayAutoSync();
+  
+  // Debug log
+  useEffect(() => {
+    console.log('📊 Sepay Auto-sync Status:', {
+      isSyncing: isSyncingSepay,
+      lastSyncTime: lastSyncTime?.toLocaleTimeString(),
+      syncStats,
+      platform: Platform.OS,
+    });
+  }, [isSyncingSepay, lastSyncTime, syncStats]);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -402,6 +417,21 @@ export default function HomeScreen() {
     setRefreshing(false);
   };
 
+  // Export loadAll để có thể gọi từ bên ngoài
+  React.useEffect(() => {
+    // Lắng nghe custom event để reload
+    const handleReloadHome = () => {
+      console.log('🔄 Reloading home data...');
+      loadAll();
+    };
+
+    // Có thể dùng EventEmitter hoặc custom event
+    // Tạm thời dùng interval để check
+    return () => {
+      // Cleanup
+    };
+  }, []);
+
   return (
     <View style={[styles.screen, { backgroundColor: '#fafafa' }]}>
       <FlatList
@@ -422,7 +452,9 @@ export default function HomeScreen() {
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
                 <ThemedText style={styles.greeting}>Xin chào! 👋</ThemedText>
-                <ThemedText style={styles.subtitle}>{monthLabel}</ThemedText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ThemedText style={styles.subtitle}>{monthLabel}</ThemedText>
+                </View>
               </View>
 
               <View style={styles.headerButtons}>
