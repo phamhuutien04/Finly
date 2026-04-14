@@ -1,5 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useNavigation } from '@react-navigation/native';
 import { supabase } from '@/lib/supabase';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
@@ -31,6 +32,7 @@ type PeriodType = 'daily' | 'weekly' | 'monthly' | 'custom';
 
 export default function BudgetFormScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   const [categories, setCategories] = useState<Category[]>([]);
@@ -50,6 +52,14 @@ export default function BudgetFormScreen() {
 
   // Preset dates
   const [presetOption, setPresetOption] = useState<'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom'>('this_month');
+
+  // Set title cho header
+  useEffect(() => {
+    navigation.setOptions({
+      title: id ? 'Chỉnh sửa ngân sách' : 'Đặt ngân sách mới',
+      headerTitle: id ? 'Chỉnh sửa ngân sách' : 'Đặt ngân sách mới',
+    });
+  }, [navigation, id]);
 
   useEffect(() => {
     fetchExpenseCategories();
@@ -267,17 +277,6 @@ export default function BudgetFormScreen() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backButtonText}>←</Text>
-          </TouchableOpacity>
-          <ThemedText style={styles.headerTitle}>
-            {id ? '✏️ Chỉnh sửa ngân sách' : '💰 Đặt ngân sách mới'}
-          </ThemedText>
-          <View style={{ width: 40 }} />
-        </View>
-
         {/* Categories */}
         <View style={styles.section}>
           <ThemedText style={styles.sectionTitle}>📋 Chọn hạng mục chi tiêu</ThemedText>

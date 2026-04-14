@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -41,6 +42,8 @@ type Budget = {
 
 export default function BudgetListScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
+  
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +59,14 @@ export default function BudgetListScreen() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Set title cho header
+  useEffect(() => {
+    navigation.setOptions({
+      title: 'Ngân sách',
+      headerTitle: 'Ngân sách',
+    });
+  }, [navigation]);
 
   useEffect(() => {
     fetchBudgets();
