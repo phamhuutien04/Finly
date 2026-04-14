@@ -1,6 +1,9 @@
 // Service để đồng bộ giao dịch từ Sepay
 import { supabase } from './supabase';
 
+// Lock để tránh sync đồng thời
+let isSyncLocked = false;
+
 // Mapping từ nội dung giao dịch sang danh mục
 const CATEGORY_MAPPING: Record<string, string[]> = {
   'Ăn uống': [
@@ -267,6 +270,21 @@ export async function syncSepayTransactions(): Promise<{
   errors: number;
   message: string;
 }> {
+  // Kiểm tra lock để tránh sync đồng thời
+  if (isSyncLocked) {
+    console.log('🔒 Sync already in progress, skipping...');
+    return {
+      success: true,
+      synced: 0,
+      skipped: 0,
+      errors: 0,
+      message: 'Sync đang chạy',
+    };
+  }
+
+  // Đặt lock
+  isSyncLocked = true;
+
   try {
     console.log('🔄 Starting Sepay sync...');
     
@@ -380,6 +398,26 @@ export async function syncSepayTransactions(): Promise<{
         
         console.log(`✨ Transaction ${tx.id} is new, will create it`);
 
+        // Lưu vào bảng tracking TRƯỚC để tránh race condition
+        const { error: preTrackError } = await supabase
+          .from('sepay_synced_transactions')
+          .insert({
+            user_id: user.id,
+            sepay_transaction_id: tx.id.toString(),
+            transaction_id: null, // Tạm thời null, sẽ update sau
+          });
+        
+        if (preTrackError) {
+          // Nếu lỗi unique constraint = đã sync rồi
+          if (preTrackError.code === '23505') {
+            console.log(`⏭️  Transaction ${tx.id} already being synced, skipping`);
+            skipped++;
+            continue;
+          }
+          console.error('❌ Error pre-tracking:', preTrackError);
+          errors++;
+          continue;
+        }
 
         // Phát hiện danh mục từ nội dung
         const detectedCategoryName = detectCategory(tx.transaction_content || '');
@@ -408,31 +446,22 @@ export async function syncSepayTransactions(): Promise<{
 
         if (insertError) {
           console.error('❌ Error inserting transaction:', insertError);
+          // Xóa record tracking vì tạo transaction thất bại
+          await supabase
+            .from('sepay_synced_transactions')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('sepay_transaction_id', tx.id.toString());
           errors++;
         } else {
           console.log(`✅ Transaction created successfully:`, newTx);
           
-          // Lưu vào bảng tracking để tránh duplicate
-          const { error: trackError } = await supabase
+          // Update transaction_id vào tracking record
+          await supabase
             .from('sepay_synced_transactions')
-            .insert({
-              user_id: user.id,
-              sepay_transaction_id: tx.id.toString(),
-              transaction_id: newTx.id,
-            });
-          
-          if (trackError) {
-            console.error('⚠️  Error tracking synced transaction:', trackError);
-            // Nếu lỗi tracking, xóa transaction vừa tạo để tránh trùng
-            await supabase
-              .from('transactions')
-              .delete()
-              .eq('id', newTx.id);
-            errors++;
-            synced--; // Giảm counter vì đã xóa
-          } else {
-            console.log(`✅ Tracked transaction ${tx.id} successfully`);
-          }
+            .update({ transaction_id: newTx.id })
+            .eq('user_id', user.id)
+            .eq('sepay_transaction_id', tx.id.toString());
           
           synced++;
         }
@@ -458,5 +487,8 @@ export async function syncSepayTransactions(): Promise<{
       errors: 0,
       message: error.message || 'Có lỗi xảy ra',
     };
+  } finally {
+    // Luôn mở lock khi kết thúc
+    isSyncLocked = false;
   }
 }
