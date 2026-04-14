@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useNavigation } from '@react-navigation/native';
 import { supabase } from '@/lib/supabase';
+import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -276,10 +276,10 @@ export default function BudgetFormScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}>
         {/* Categories */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>📋 Chọn hạng mục chi tiêu</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Chọn hạng mục chi tiêu</ThemedText>
           
           {loadingCategories ? (
             <View style={styles.centerLoading}>
@@ -327,7 +327,7 @@ export default function BudgetFormScreen() {
 
         {/* Amount */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>💰 Giới hạn chi tiêu</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Giới hạn chi tiêu</ThemedText>
           <View style={styles.amountInputContainer}>
             <Text style={styles.currencyLabel}>VNĐ</Text>
             <TextInput
@@ -343,7 +343,7 @@ export default function BudgetFormScreen() {
 
         {/* Period Selection */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>📅 Chu kỳ</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Chu kỳ</ThemedText>
           
           <View style={styles.periodRow}>
             <TouchableOpacity
@@ -353,7 +353,6 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('daily')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'daily' && styles.periodBtnTextActive]}>📅</Text>
               <Text style={[styles.periodBtnText, period === 'daily' && styles.periodBtnTextActive]}>
                 Ngày
               </Text>
@@ -366,7 +365,6 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('weekly')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'weekly' && styles.periodBtnTextActive]}>�</Text>
               <Text style={[styles.periodBtnText, period === 'weekly' && styles.periodBtnTextActive]}>
                 Tuần
               </Text>
@@ -379,7 +377,6 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('monthly')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'monthly' && styles.periodBtnTextActive]}>�</Text>
               <Text style={[styles.periodBtnText, period === 'monthly' && styles.periodBtnTextActive]}>
                 Tháng
               </Text>
@@ -392,7 +389,6 @@ export default function BudgetFormScreen() {
               ]}
               onPress={() => handlePeriodChange('custom')}
             >
-              <Text style={[styles.periodBtnIcon, period === 'custom' && styles.periodBtnTextActive]}>⚙️</Text>
               <Text style={[styles.periodBtnText, period === 'custom' && styles.periodBtnTextActive]}>
                 Tùy chỉnh
               </Text>
@@ -403,7 +399,7 @@ export default function BudgetFormScreen() {
         {/* Preset Options */}
         {period !== 'custom' && (
           <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>🎯 Chọn khoảng thời gian</ThemedText>
+            <ThemedText style={styles.sectionTitle}>Chọn khoảng thời gian</ThemedText>
             
             <View style={styles.presetRow}>
               {(period === 'weekly' || period === 'monthly') && (
@@ -419,7 +415,7 @@ export default function BudgetFormScreen() {
                       styles.presetBtnText,
                       presetOption === `this_${period}` && styles.presetBtnTextActive
                     ]}>
-                      {period === 'weekly' ? '📅 Tuần này' : '📅 Tháng này'}
+                      {period === 'weekly' ? 'Tuần này' : 'Tháng này'}
                     </Text>
                   </TouchableOpacity>
 
@@ -434,7 +430,7 @@ export default function BudgetFormScreen() {
                       styles.presetBtnText,
                       presetOption === `next_${period}` && styles.presetBtnTextActive
                     ]}>
-                      {period === 'weekly' ? '📅 Tuần sau' : '📅 Tháng sau'}
+                      {period === 'weekly' ? 'Tuần sau' : 'Tháng sau'}
                     </Text>
                   </TouchableOpacity>
                 </>
@@ -445,7 +441,7 @@ export default function BudgetFormScreen() {
 
         {/* Date Range */}
         <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>📆 Khoảng thời gian</ThemedText>
+          <ThemedText style={styles.sectionTitle}>Khoảng thời gian</ThemedText>
           
           <View style={styles.dateRangeContainer}>
             <View style={styles.dateBox}>
@@ -454,7 +450,6 @@ export default function BudgetFormScreen() {
                 style={styles.dateButton}
                 onPress={() => setShowStartPicker(true)}
               >
-                <Text style={styles.dateIcon}>📅</Text>
                 <Text style={styles.dateText}>{formatDate(startDate)}</Text>
               </TouchableOpacity>
             </View>
@@ -467,7 +462,6 @@ export default function BudgetFormScreen() {
                 style={styles.dateButton}
                 onPress={() => setShowEndPicker(true)}
               >
-                <Text style={styles.dateIcon}>📅</Text>
                 <Text style={styles.dateText}>{formatDate(endDate)}</Text>
               </TouchableOpacity>
             </View>
@@ -607,7 +601,7 @@ export default function BudgetFormScreen() {
         {/* Summary */}
         {selectedCategoryId && amount && (
           <View style={styles.summarySection}>
-            <ThemedText style={styles.summaryTitle}>📊 Tóm tắt</ThemedText>
+            <ThemedText style={styles.summaryTitle}>Tóm tắt</ThemedText>
             
             <View style={styles.summaryRow}>
               <ThemedText style={styles.summaryLabel}>Hạng mục:</ThemedText>
@@ -652,15 +646,13 @@ export default function BudgetFormScreen() {
             <ActivityIndicator color="#FFF" />
           ) : (
             <>
-              <Text style={styles.saveButtonIcon}>💾</Text>
+              <Text style={styles.saveButtonIcon}></Text>
               <Text style={styles.saveButtonText}>
                 {id ? 'Cập nhật ngân sách' : 'Tạo ngân sách'}
               </Text>
             </>
           )}
         </TouchableOpacity>
-
-        <View style={{ height: 20 }} />
       </ScrollView>
     </ThemedView>
   );
@@ -669,177 +661,160 @@ export default function BudgetFormScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-    paddingVertical: 8,
-  },
-  backButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#333',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    backgroundColor: '#F8F9FA',
   },
   section: {
     backgroundColor: '#FFF',
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 16,
+    color: '#1F2937',
   },
   centerLoading: {
-    padding: 30,
+    padding: 40,
     alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
-    color: '#666',
+    color: '#6B7280',
+    fontSize: 14,
   },
   centerEmpty: {
-    padding: 30,
+    padding: 40,
     alignItems: 'center',
   },
   emptyIcon: {
-    fontSize: 48,
-    color: '#CCC',
+    fontSize: 56,
+    marginBottom: 12,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 15,
+    color: '#6B7280',
     marginTop: 8,
+    fontWeight: '600',
   },
   emptySubtext: {
-    fontSize: 12,
-    color: '#CCC',
-    marginTop: 4,
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginTop: 6,
+    textAlign: 'center',
   },
   categoryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 10,
   },
   categoryItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: '#FFF',
-    borderWidth: 1,
-    borderColor: '#ef4444',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 2,
+    borderColor: '#FEE2E2',
   },
   categoryItemSelected: {
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
   },
   categoryIcon: {
-    fontSize: 16,
-    color: '#ef4444',
+    fontSize: 18,
   },
   categoryText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#DC2626',
   },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 16,
     overflow: 'hidden',
+    backgroundColor: '#F9FAFB',
   },
   currencyLabel: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#F5F5F5',
-    color: '#666',
-    fontWeight: '600',
-    fontSize: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    backgroundColor: '#EF4444',
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 15,
   },
   amountInput: {
     flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#333',
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#1F2937',
+    fontWeight: '600',
   },
   periodRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   periodBtn: {
     flex: 1,
-    flexDirection: 'column',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   periodBtnActive: {
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
-  },
-  periodBtnIcon: {
-    fontSize: 20,
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
   },
   periodBtnText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 15,
+    color: '#6B7280',
+    fontWeight: '600',
   },
   periodBtnTextActive: {
     color: '#FFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   presetRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
   },
   presetBtn: {
     flex: 1,
-    paddingVertical: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
+    paddingVertical: 14,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   presetBtnActive: {
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
+    backgroundColor: '#EF4444',
+    borderColor: '#DC2626',
   },
   presetBtnText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   presetBtnTextActive: {
     color: '#FFF',
+    fontWeight: '700',
   },
   dateRangeContainer: {
     flexDirection: 'row',
@@ -851,118 +826,127 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 6,
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 8,
+    fontWeight: '600',
   },
   dateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  dateIcon: {
-    fontSize: 18,
+    justifyContent: 'center',
+    padding: 14,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
   },
   dateText: {
-    fontSize: 13,
-    color: '#333',
-    flex: 1,
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '600',
   },
   dateArrow: {
-    fontSize: 20,
-    color: '#999',
-    marginTop: 20,
+    fontSize: 24,
+    color: '#EF4444',
+    marginTop: 24,
+    fontWeight: 'bold',
   },
   summarySection: {
-    backgroundColor: '#FFF9F9',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 16,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ef4444',
+    borderWidth: 2,
+    borderColor: '#FEE2E2',
   },
   summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ef4444',
-    marginBottom: 12,
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginBottom: 16,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#FFE5E5',
+    borderBottomColor: '#FEE2E2',
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#6B7280',
+    fontWeight: '500',
   },
   summaryValue: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: '#1F2937',
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#ef4444',
-    paddingVertical: 16,
-    borderRadius: 16,
+    gap: 10,
+    backgroundColor: '#EF4444',
+    paddingVertical: 18,
+    borderRadius: 20,
+    marginHorizontal: 16,
     marginTop: 8,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   saveButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   saveButtonIcon: {
-    fontSize: 20,
-    color: '#FFF',
+    fontSize: 22,
   },
   saveButtonText: {
     color: '#FFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   
   cancelButton: {
-    paddingVertical: 16,
-    borderRadius: 16,
+    paddingVertical: 18,
+    borderRadius: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
     backgroundColor: '#FFF',
   },
-  
+
   cancelButtonText: {
-    color: '#666',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#6B7280',
+    fontSize: 17,
+    fontWeight: '700',
   },
-  
-  // Web date picker styles
   webDatePicker: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   webDatePickerContent: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     width: '90%',
     maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
   },
 });
