@@ -177,7 +177,7 @@ export default function BudgetListScreen() {
 
       setModalVisible(false);
       fetchBudgets();
-      showAlert('Thành công', 'Đã cập nhật ngân sách', 'success');
+      // Không cần hiện thông báo, chỉ đóng modal
     } catch (err: any) {
       showAlert('Lỗi', 'Không cập nhật được: ' + err.message, 'error');
     } finally {
@@ -240,7 +240,7 @@ export default function BudgetListScreen() {
       }
 
       fetchBudgets();
-      showAlert('Thành công', 'Đã xóa ngân sách', 'success');
+      // Không cần hiện thông báo, chỉ reload danh sách
     } catch (err: any) {
       console.error('[Lỗi xóa]', err);
       showAlert('Lỗi', err.message || 'Có lỗi xảy ra khi xóa', 'error');

@@ -2,16 +2,16 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -519,10 +519,7 @@ export default function ModalAddTransactionNoAccount() {
 
         if (insErr) throw insErr;
         
-        showSuccess(
-          "Thành công", 
-          "Đã thêm giao dịch!"
-        );
+        // Không cần hiện thông báo, chỉ đóng modal
       }
 
       // Kiểm tra ngân sách nếu là giao dịch chi tiêu

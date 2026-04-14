@@ -82,19 +82,30 @@ export async function checkBudgetAndNotify(userId: string) {
     // Kiểm tra từng ngân sách
     for (const budget of budgets) {
       // Tính tổng chi tiêu trong khoảng thời gian ngân sách
+      // CHỈ tính các giao dịch có transaction_date TRONG khoảng start_date và end_date
       const { data: transactions, error: txError } = await supabase
         .from('transactions')
-        .select('amount')
+        .select('amount, transaction_date')
         .eq('user_id', userId)
-        .eq('category_id', budget.category_id  || 0) // Thêm fallback
+        .eq('category_id', budget.category_id || 0)
         .eq('type', 'expense')
         .gte('transaction_date', budget.start_date)
         .lte('transaction_date', budget.end_date);
 
-      if (txError) continue;
+      if (txError) {
+        console.error('Lỗi truy vấn giao dịch:', txError);
+        continue;
+      }
 
       const totalSpent = transactions?.reduce((sum, tx) => sum + Number(tx.amount), 0) || 0;
       const percentage = (totalSpent / budget.amount) * 100;
+
+      console.log(`📊 Ngân sách ${budget.id} (${budget.start_date} → ${budget.end_date}):`, {
+        totalSpent,
+        budgetAmount: budget.amount,
+        percentage: percentage.toFixed(1) + '%',
+        transactionCount: transactions?.length || 0,
+      });
 
       // Nếu vượt quá 80% hoặc 100% ngân sách
       if (percentage >= 80) {

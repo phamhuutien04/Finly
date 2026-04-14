@@ -275,10 +275,8 @@ export default function BudgetFormScreen() {
     if (result.error) {
       showAlert('Lỗi', result.error.message, 'error');
     } else {
-      showAlert('Thành công', id ? 'Đã cập nhật ngân sách' : 'Đã tạo ngân sách', 'success');
-      setTimeout(() => {
-        router.back();
-      }, 1500);
+      // Không cần hiện thông báo, chỉ quay về trang trước
+      router.back();
     }
   };
 
