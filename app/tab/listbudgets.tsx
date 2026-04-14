@@ -1,10 +1,10 @@
+import CustomAlert from '@/components/CustomAlert';
 import { supabase } from '@/lib/supabase';
 import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -60,6 +60,24 @@ export default function BudgetListScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Custom Alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'info'>('info');
+  
+  // Confirm delete state
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [budgetToDelete, setBudgetToDelete] = useState<string | null>(null);
+
+  // Helper function to show custom alert
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
+
   // Set title cho header
   useEffect(() => {
     navigation.setOptions({
@@ -78,7 +96,7 @@ export default function BudgetListScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const user = session?.user;
-      if (!user) return Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+      if (!user) return showAlert('Lỗi', 'Vui lòng đăng nhập', 'error');
 
       const { data, error } = await supabase
         .from('budgets')
@@ -97,7 +115,7 @@ export default function BudgetListScreen() {
       if (error) throw error;
       setBudgets(data || []);
     } catch (err: any) {
-      Alert.alert('Lỗi', 'Không tải được danh sách: ' + err.message);
+      showAlert('Lỗi', 'Không tải được danh sách: ' + err.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -135,9 +153,9 @@ export default function BudgetListScreen() {
 
   const handleSaveEdit = async () => {
     if (!editingBudget) return;
-    if (!amount || Number(amount) <= 0) return Alert.alert('Lỗi', 'Số tiền phải lớn hơn 0');
-    if (!selectedCategoryId) return Alert.alert('Lỗi', 'Vui lòng chọn hạng mục');
-    if (startDate > endDate) return Alert.alert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc');
+    if (!amount || Number(amount) <= 0) return showAlert('Lỗi', 'Số tiền phải lớn hơn 0', 'error');
+    if (!selectedCategoryId) return showAlert('Lỗi', 'Vui lòng chọn hạng mục', 'error');
+    if (startDate > endDate) return showAlert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc', 'error');
 
     setSaving(true);
 
@@ -159,37 +177,33 @@ export default function BudgetListScreen() {
 
       setModalVisible(false);
       fetchBudgets();
-      Alert.alert('Thành công', 'Đã cập nhật ngân sách');
+      showAlert('Thành công', 'Đã cập nhật ngân sách', 'success');
     } catch (err: any) {
-      Alert.alert('Lỗi', 'Không cập nhật được: ' + err.message);
+      showAlert('Lỗi', 'Không cập nhật được: ' + err.message, 'error');
     } finally {
       setSaving(false);
     }
   };
 
-  // Hàm xóa với confirm dialog cho cả web và mobile
+  // Hàm xóa với confirm dialog
   const confirmDelete = (budgetId: string) => {
-    if (Platform.OS === 'web') {
-      // Dùng window.confirm cho web
-      const confirmed = window.confirm('Bạn có chắc muốn xóa ngân sách này? Không thể khôi phục.');
-      if (confirmed) {
-        handleDelete(budgetId);
-      }
-    } else {
-      // Dùng Alert.alert cho mobile
-      Alert.alert(
-        'Xác nhận xóa',
-        'Bạn có chắc muốn xóa ngân sách này? Không thể khôi phục.',
-        [
-          { text: 'Hủy', style: 'cancel' },
-          {
-            text: 'Xóa',
-            style: 'destructive',
-            onPress: () => handleDelete(budgetId),
-          },
-        ]
-      );
+    setBudgetToDelete(budgetId);
+    setConfirmDeleteVisible(true);
+  };
+
+  // Xác nhận xóa
+  const handleConfirmDelete = () => {
+    setConfirmDeleteVisible(false);
+    if (budgetToDelete) {
+      handleDelete(budgetToDelete);
+      setBudgetToDelete(null);
     }
+  };
+
+  // Hủy xóa
+  const handleCancelDelete = () => {
+    setConfirmDeleteVisible(false);
+    setBudgetToDelete(null);
   };
 
   // Hàm xóa thực tế
@@ -200,7 +214,7 @@ export default function BudgetListScreen() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        Alert.alert('Lỗi', 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.');
+        showAlert('Lỗi', 'Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại.', 'error');
         return;
       }
 
@@ -214,22 +228,22 @@ export default function BudgetListScreen() {
       if (error) {
         console.error('[Xóa thất bại]', error);
         if (error.code === '42501' || error.message.includes('permission denied')) {
-          Alert.alert(
+          showAlert(
             'Lỗi quyền',
-            'Không có quyền xóa. Vui lòng kiểm tra policy DELETE trong Supabase:\n' +
-            'USING: auth.uid() = user_id'
+            'Không có quyền xóa. Vui lòng kiểm tra policy DELETE trong Supabase:\nUSING: auth.uid() = user_id',
+            'error'
           );
         } else {
-          Alert.alert('Lỗi', error.message || 'Không xóa được');
+          showAlert('Lỗi', error.message || 'Không xóa được', 'error');
         }
         return;
       }
 
       fetchBudgets();
-      Alert.alert('Thành công', 'Đã xóa ngân sách');
+      showAlert('Thành công', 'Đã xóa ngân sách', 'success');
     } catch (err: any) {
       console.error('[Lỗi xóa]', err);
-      Alert.alert('Lỗi', err.message || 'Có lỗi xảy ra khi xóa');
+      showAlert('Lỗi', err.message || 'Có lỗi xảy ra khi xóa', 'error');
     }
   };
 
@@ -510,6 +524,48 @@ export default function BudgetListScreen() {
           </ThemedView>
         </View>
       </Modal>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
+
+      {/* Confirm Delete Dialog */}
+      <Modal
+        visible={confirmDeleteVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={handleCancelDelete}
+      >
+        <View style={styles.confirmOverlay}>
+          <View style={styles.confirmBox}>
+            <Text style={styles.confirmTitle}>Xác nhận xóa</Text>
+            <Text style={styles.confirmMessage}>
+              Bạn có chắc muốn xóa ngân sách này? Không thể khôi phục.
+            </Text>
+            
+            <View style={styles.confirmButtons}>
+              <TouchableOpacity
+                style={styles.confirmCancelBtn}
+                onPress={handleCancelDelete}
+              >
+                <Text style={styles.confirmCancelText}>Hủy</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.confirmDeleteBtn}
+                onPress={handleConfirmDelete}
+              >
+                <Text style={styles.confirmDeleteText}>Xóa</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -678,5 +734,66 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '90%',
     maxWidth: 400,
+  },
+  
+  // Confirm delete dialog styles
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmBox: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  confirmMessage: {
+    fontSize: 15,
+    color: '#6B7280',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  confirmButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  confirmCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#E5E7EB',
+  },
+  confirmCancelText: {
+    color: '#374151',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#EF4444',
+  },
+  confirmDeleteText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

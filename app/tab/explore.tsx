@@ -1,3 +1,4 @@
+import CustomAlert from '@/components/CustomAlert';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { supabase } from '@/lib/supabase';
@@ -6,7 +7,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -50,8 +50,22 @@ export default function BudgetFormScreen() {
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // Custom Alert state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'info'>('info');
+
   // Preset dates
   const [presetOption, setPresetOption] = useState<'this_week' | 'next_week' | 'this_month' | 'next_month' | 'custom'>('this_month');
+
+  // Helper function to show custom alert
+  const showAlert = (title: string, message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   // Set title cho header
   useEffect(() => {
@@ -177,7 +191,7 @@ export default function BudgetFormScreen() {
       const uid = session?.user?.id;
 
       if (!uid) {
-        Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+        showAlert('Lỗi', 'Vui lòng đăng nhập', 'error');
         return;
       }
 
@@ -191,7 +205,7 @@ export default function BudgetFormScreen() {
       if (error) throw error;
       setCategories(data || []);
     } catch (err: any) {
-      Alert.alert('Lỗi', err.message);
+      showAlert('Lỗi', err.message, 'error');
     } finally {
       setLoadingCategories(false);
     }
@@ -206,7 +220,7 @@ export default function BudgetFormScreen() {
         .single();
 
       if (error) throw error;
-      if (!data) return Alert.alert('Không tìm thấy');
+      if (!data) return showAlert('Lỗi', 'Không tìm thấy ngân sách', 'error');
 
       setSelectedCategoryId(data.category_id);
       setAmount(data.amount.toString());
@@ -214,19 +228,19 @@ export default function BudgetFormScreen() {
       setStartDate(new Date(data.start_date));
       setEndDate(new Date(data.end_date));
     } catch (err: any) {
-      Alert.alert('Lỗi', err.message);
+      showAlert('Lỗi', err.message, 'error');
     }
   };
 
   const handleSave = async () => {
     if (!amount || Number(amount) <= 0) {
-      return Alert.alert('Lỗi', 'Số tiền phải lớn hơn 0');
+      return showAlert('Lỗi', 'Số tiền phải lớn hơn 0', 'error');
     }
     if (!selectedCategoryId) {
-      return Alert.alert('Lỗi', 'Vui lòng chọn hạng mục');
+      return showAlert('Lỗi', 'Vui lòng chọn hạng mục', 'error');
     }
     if (startDate > endDate) {
-      return Alert.alert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc');
+      return showAlert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc', 'error');
     }
 
     setSaving(true);
@@ -234,7 +248,7 @@ export default function BudgetFormScreen() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
       setSaving(false);
-      return Alert.alert('Lỗi', 'Vui lòng đăng nhập');
+      return showAlert('Lỗi', 'Vui lòng đăng nhập', 'error');
     }
 
     // Chuyển đổi period: nếu là 'daily' thì lưu là 'custom' vào database
@@ -259,10 +273,12 @@ export default function BudgetFormScreen() {
     setSaving(false);
 
     if (result.error) {
-      Alert.alert('Lỗi', result.error.message);
+      showAlert('Lỗi', result.error.message, 'error');
     } else {
-      Alert.alert('Thành công', id ? 'Đã cập nhật' : 'Đã tạo ngân sách');
-      router.back();
+      showAlert('Thành công', id ? 'Đã cập nhật ngân sách' : 'Đã tạo ngân sách', 'success');
+      setTimeout(() => {
+        router.back();
+      }, 1500);
     }
   };
 
@@ -654,6 +670,15 @@ export default function BudgetFormScreen() {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
     </ThemedView>
   );
 }
