@@ -2,19 +2,19 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, Stack, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 
 const isValidEmail = (email: string) =>
@@ -22,6 +22,8 @@ const isValidEmail = (email: string) =>
 
 export default function RegisterScreen() {
   const router = useRouter();
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -123,6 +125,20 @@ export default function RegisterScreen() {
     }
   };
 
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#64748b';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const inputBg = isDark ? '#374151' : '#ffffff';
+  const inputText = isDark ? '#f9fafb' : '#111827';
+  const iconColor = isDark ? '#9ca3af' : '#6B7280';
+  const buttonBg = isDark ? '#6366f1' : '#111';
+  const buttonText = '#ffffff';
+  const checkboxBg = isDark ? '#4b5563' : '#E5E7EB';
+  const checkboxIcon = isDark ? '#f9fafb' : '#111';
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -131,56 +147,62 @@ export default function RegisterScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ThemedView style={styles.screen}>
-          <ThemedView style={styles.header}>
-            <ThemedView style={styles.logo}>
-              <ThemedText style={styles.logoText}>F</ThemedText>
-            </ThemedView>
+        <View style={[styles.screen, { backgroundColor: screenBg }]}>
+          <View style={styles.header}>
+            <View style={[styles.logo, { borderColor, backgroundColor: cardBg }]}>
+              <ThemedText style={[styles.logoText, { color: text }]}>F</ThemedText>
+            </View>
 
-            <ThemedText type="title">Đăng ký</ThemedText>
-            <ThemedText style={styles.muted}>
+            <ThemedText type="title" style={{ color: text }}>Đăng ký</ThemedText>
+            <ThemedText style={[styles.muted, { color: subtleText }]}>
               Tạo tài khoản để bắt đầu quản lí chi tiêu.
             </ThemedText>
-          </ThemedView>
+          </View>
 
-          <ThemedView style={styles.card}>
-            <ThemedText style={styles.label}>Họ và tên</ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="person-outline" size={18} color="#6B7280" />
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            <ThemedText style={[styles.label, { color: text }]}>Họ và tên</ThemedText>
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="person-outline" size={18} color={iconColor} />
               <TextInput
                 value={fullName}
                 onChangeText={setFullName}
-                placeholder="vd: Phạm Hữu Tiến"
-                style={styles.input}
+                placeholder="Họ và tên"
+                placeholderTextColor={subtleText}
+                autoComplete="name"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
               />
             </View>
 
-            <ThemedText style={[styles.label, { marginTop: 12 }]}>
+            <ThemedText style={[styles.label, { marginTop: 12, color: text }]}>
               Email
             </ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color="#6B7280" />
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="mail-outline" size={18} color={iconColor} />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="vd: tien@gmail.com"
+                placeholder="Email"
+                placeholderTextColor={subtleText}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                style={styles.input}
+                autoComplete="email"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
               />
             </View>
 
-            <ThemedText style={[styles.label, { marginTop: 12 }]}>
+            <ThemedText style={[styles.label, { marginTop: 12, color: text }]}>
               Mật khẩu
             </ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color="#6B7280" />
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={iconColor} />
               <TextInput
                 value={pass}
                 onChangeText={setPass}
                 placeholder="Tối thiểu 6 ký tự"
+                placeholderTextColor={subtleText}
                 secureTextEntry={!showPass}
-                style={styles.input}
+                autoComplete="new-password"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
               />
               <Pressable
                 onPress={() => setShowPass((v) => !v)}
@@ -189,22 +211,24 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={showPass ? "eye-off-outline" : "eye-outline"}
                   size={18}
-                  color="#6B7280"
+                  color={iconColor}
                 />
               </Pressable>
             </View>
 
-            <ThemedText style={[styles.label, { marginTop: 12 }]}>
+            <ThemedText style={[styles.label, { marginTop: 12, color: text }]}>
               Xác nhận mật khẩu
             </ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="shield-checkmark-outline" size={18} color="#6B7280" />
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={iconColor} />
               <TextInput
                 value={confirm}
                 onChangeText={setConfirm}
                 placeholder="Nhập lại mật khẩu"
+                placeholderTextColor={subtleText}
                 secureTextEntry={!showConfirm}
-                style={styles.input}
+                autoComplete="new-password"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
               />
               <Pressable
                 onPress={() => setShowConfirm((v) => !v)}
@@ -213,7 +237,7 @@ export default function RegisterScreen() {
                 <Ionicons
                   name={showConfirm ? "eye-off-outline" : "eye-outline"}
                   size={18}
-                  color="#6B7280"
+                  color={iconColor}
                 />
               </Pressable>
             </View>
@@ -223,10 +247,10 @@ export default function RegisterScreen() {
               style={styles.termsRow}
               disabled={loading}
             >
-              <View style={[styles.checkbox, agree && styles.checkboxOn]}>
-                {agree && <Ionicons name="checkmark" size={14} color="#111" />}
+              <View style={[styles.checkbox, { borderColor }, agree && { backgroundColor: checkboxBg }]}>
+                {agree && <Ionicons name="checkmark" size={14} color={checkboxIcon} />}
               </View>
-              <ThemedText style={{ flex: 1, fontWeight: "700", opacity: 0.9 }}>
+              <ThemedText style={{ flex: 1, fontWeight: "700", opacity: 0.9, color: text }}>
                 Tôi đồng ý Điều khoản & Chính sách
               </ThemedText>
             </Pressable>
@@ -235,29 +259,30 @@ export default function RegisterScreen() {
               onPress={onRegister}
               style={[
                 styles.btnSolid,
+                { backgroundColor: buttonBg },
                 (!canSubmit || loading) && styles.btnDisabled,
               ]}
               disabled={!canSubmit || loading}
             >
               {loading ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={buttonText} />
               ) : (
-                <ThemedText style={styles.btnSolidText}>Tạo tài khoản</ThemedText>
+                <ThemedText style={[styles.btnSolidText, { color: buttonText }]}>Tạo tài khoản</ThemedText>
               )}
             </Pressable>
 
             <View style={styles.footerRow}>
-              <ThemedText style={styles.muted}>Đã có tài khoản?</ThemedText>
+              <ThemedText style={[styles.muted, { color: subtleText }]}>Đã có tài khoản?</ThemedText>
               <Link href="/auth/login" asChild>
                 <Pressable disabled={loading}>
-                  <ThemedText style={styles.link}>Đăng nhập</ThemedText>
+                  <ThemedText style={[styles.link, { color: text }]}>Đăng nhập</ThemedText>
                 </Pressable>
               </Link>
             </View>
-          </ThemedView>
+          </View>
 
-          <ThemedText style={styles.copy}>© {new Date().getFullYear()} Finly</ThemedText>
-        </ThemedView>
+          <ThemedText style={[styles.copy, { color: subtleText }]}>© {new Date().getFullYear()} Finly</ThemedText>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -274,7 +299,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
     marginBottom: 6,
   },
   logoText: { fontSize: 22, fontWeight: "900" },
@@ -284,7 +308,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
 
   label: { fontWeight: "800", marginBottom: 8 },
@@ -297,7 +320,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
   input: { flex: 1 },
   eyeBtn: { padding: 6, marginRight: -6 },
@@ -309,20 +331,17 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 6,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
     alignItems: "center",
     justifyContent: "center",
   },
-  checkboxOn: { backgroundColor: "#E5E7EB" },
 
   btnSolid: {
     marginTop: 14,
     paddingVertical: 13,
     borderRadius: 16,
-    backgroundColor: "#111",
     alignItems: "center",
   },
-  btnSolidText: { color: "#fff", fontWeight: "900" },
+  btnSolidText: { fontWeight: "900" },
   btnDisabled: { opacity: 0.6 },
 
   footerRow: { flexDirection: "row", justifyContent: "center", gap: 6, marginTop: 14 },

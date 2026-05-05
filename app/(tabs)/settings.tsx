@@ -760,8 +760,6 @@ export default function SettingsScreen() {
                     return;
                   }
                   
-                  showSuccess("Đăng xuất", "Đã đăng xuất thành công");
-                  
                   // Router sẽ tự động redirect về login nhờ auth listener trong _layout.tsx
                 } catch (err: any) {
                   showError("Lỗi", err?.message || "Có lỗi xảy ra");

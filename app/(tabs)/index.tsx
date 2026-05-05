@@ -2,17 +2,17 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  Image,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Image,
+    Platform,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -134,6 +134,7 @@ export default function HomeScreen() {
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
   const [expense, setExpense] = useState(0);
+  const [userName, setUserName] = useState<string>('');
 
   const monthLabel = useMemo(() => getMonthLabel(), []);
 
@@ -150,6 +151,22 @@ export default function HomeScreen() {
     return userId ?? null;
   };
 
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('display_name')
+        .eq('user_id', userId)
+        .single();
+      
+      if (!error && data?.display_name) {
+        setUserName(data.display_name);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
+
   const loadAll = async () => {
     const userId = await getUserId();
     if (!userId) {
@@ -157,6 +174,9 @@ export default function HomeScreen() {
       setLoading(false);
       return;
     }
+
+    // Load user profile
+    await loadUserProfile(userId);
 
     try {
       const { data: allTx, error: allErr } = await supabase
@@ -464,7 +484,9 @@ export default function HomeScreen() {
             {/* Header */}
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={[styles.greeting, { color: text }]}>Xin chào! 👋</ThemedText>
+                <ThemedText style={[styles.greeting, { color: text }]}>
+                  Xin chào{userName ? `, ${userName}` : ''}!
+                </ThemedText>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <ThemedText style={[styles.subtitle, { color: subtleText }]}>{monthLabel}</ThemedText>
                 </View>
@@ -906,6 +928,7 @@ const styles = StyleSheet.create({
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'flex-start',
+    gap: 16,
     marginBottom: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
   },
   actionCard: {

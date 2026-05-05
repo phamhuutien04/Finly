@@ -2,27 +2,30 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, Stack, useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    StyleSheet,
+    TextInput,
+    View,
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { configureGoogleSignIn, signInWithGoogle } from "@/lib/googleSignIn";
 import { supabase } from "@/lib/supabase";
+
 
 const isValidEmail = (email: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
 export default function LoginScreen() {
   const router = useRouter();
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
 
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
@@ -236,6 +239,21 @@ export default function LoginScreen() {
     }
   };
 
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#64748b';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const inputBg = isDark ? '#374151' : '#ffffff';
+  const inputText = isDark ? '#f9fafb' : '#111827';
+  const iconColor = isDark ? '#9ca3af' : '#6B7280';
+  const buttonBg = isDark ? '#6366f1' : '#111';
+  const buttonText = '#ffffff';
+  const outlineButtonBg = isDark ? '#374151' : '#ffffff';
+  const outlineButtonText = isDark ? '#f9fafb' : '#111';
+  const outlineButtonIcon = isDark ? '#f9fafb' : '#111';
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -244,46 +262,50 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <ThemedView style={styles.screen}>
+        <View style={[styles.screen, { backgroundColor: screenBg }]}>
           {/* Header */}
-          <ThemedView style={styles.header}>
-            <ThemedView style={styles.logo}>
-              <ThemedText style={styles.logoText}>F</ThemedText>
-            </ThemedView>
+          <View style={styles.header}>
+            <View style={[styles.logo, { borderColor, backgroundColor: cardBg }]}>
+              <ThemedText style={[styles.logoText, { color: text }]}>F</ThemedText>
+            </View>
 
-            <ThemedText type="title">Đăng nhập</ThemedText>
-            <ThemedText style={styles.muted}>
+            <ThemedText type="title" style={{ color: text }}>Đăng nhập</ThemedText>
+            <ThemedText style={[styles.muted, { color: subtleText }]}>
               Quản lí chi tiêu nhanh, gọn, rõ ràng.
             </ThemedText>
-          </ThemedView>
+          </View>
 
           {/* Card */}
-          <ThemedView style={styles.card}>
-            <ThemedText style={styles.label}>Email</ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="mail-outline" size={18} color="#6B7280" />
+          <View style={[styles.card, { backgroundColor: cardBg, borderColor }]}>
+            <ThemedText style={[styles.label, { color: text }]}>Email</ThemedText>
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="mail-outline" size={18} color={iconColor} />
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="vd: tien@gmail.com"
+                placeholder="Email"
+                placeholderTextColor={subtleText}
                 autoCapitalize="none"
                 keyboardType="email-address"
-                style={styles.input}
+                autoComplete="email"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
                 editable={!loading}
               />
             </View>
 
-            <ThemedText style={[styles.label, { marginTop: 12 }]}>
+            <ThemedText style={[styles.label, { marginTop: 12, color: text }]}>
               Mật khẩu
             </ThemedText>
-            <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={18} color="#6B7280" />
+            <View style={[styles.inputWrap, { backgroundColor: inputBg, borderColor }]}>
+              <Ionicons name="lock-closed-outline" size={18} color={iconColor} />
               <TextInput
                 value={pass}
                 onChangeText={setPass}
-                placeholder="Nhập mật khẩu"
+                placeholder="Mật khẩu"
+                placeholderTextColor={subtleText}
                 secureTextEntry={!show}
-                style={styles.input}
+                autoComplete="password"
+                style={[styles.input, { color: inputText, backgroundColor: inputBg }]}
                 editable={!loading}
               />
               <Pressable
@@ -294,7 +316,7 @@ export default function LoginScreen() {
                 <Ionicons
                   name={show ? "eye-off-outline" : "eye-outline"}
                   size={18}
-                  color="#6B7280"
+                  color={iconColor}
                 />
               </Pressable>
             </View>
@@ -302,12 +324,12 @@ export default function LoginScreen() {
             {/* Row links */}
             <View style={styles.row}>
               <Pressable onPress={onForgot} disabled={loading}>
-                <ThemedText style={styles.link}>Quên mật khẩu?</ThemedText>
+                <ThemedText style={[styles.link, { color: text }]}>Quên mật khẩu?</ThemedText>
               </Pressable>
 
               <Link href="/auth/register" asChild>
                 <Pressable disabled={loading}>
-                  <ThemedText style={styles.link}>Đăng ký</ThemedText>
+                  <ThemedText style={[styles.link, { color: text }]}>Đăng ký</ThemedText>
                 </Pressable>
               </Link>
             </View>
@@ -315,45 +337,53 @@ export default function LoginScreen() {
             {/* Button */}
             <Pressable
               onPress={onLogin}
-              style={[styles.btnSolid, (!canSubmit || loading) && styles.btnDisabled]}
+              style={[
+                styles.btnSolid, 
+                { backgroundColor: buttonBg },
+                (!canSubmit || loading) && styles.btnDisabled
+              ]}
               disabled={!canSubmit || loading}
             >
               {loading ? (
-                <ActivityIndicator />
+                <ActivityIndicator color={buttonText} />
               ) : (
-                <ThemedText style={styles.btnSolidText}>Đăng nhập</ThemedText>
+                <ThemedText style={[styles.btnSolidText, { color: buttonText }]}>Đăng nhập</ThemedText>
               )}
             </Pressable>
 
             {/* Divider */}
             <View style={styles.divider}>
-              <View style={styles.line} />
-              <ThemedText style={styles.muted}>hoặc</ThemedText>
-              <View style={styles.line} />
+              <View style={[styles.line, { backgroundColor: borderColor }]} />
+              <ThemedText style={[styles.muted, { color: subtleText }]}>hoặc</ThemedText>
+              <View style={[styles.line, { backgroundColor: borderColor }]} />
             </View>
 
             <Pressable
               onPress={onGoogleSignIn}
-              style={[styles.btnOutline, googleLoading && styles.btnDisabled]}
+              style={[
+                styles.btnOutline, 
+                { backgroundColor: outlineButtonBg, borderColor },
+                googleLoading && styles.btnDisabled
+              ]}
               disabled={loading || googleLoading}
             >
               {googleLoading ? (
-                <ActivityIndicator size="small" color="#111" />
+                <ActivityIndicator size="small" color={outlineButtonText} />
               ) : (
                 <>
-                  <Ionicons name="logo-google" size={18} color="#111" />
-                  <ThemedText style={styles.btnOutlineText}>
+                  <Ionicons name="logo-google" size={18} color={outlineButtonIcon} />
+                  <ThemedText style={[styles.btnOutlineText, { color: outlineButtonText }]}>
                     Đăng nhập với Google
                   </ThemedText>
                 </>
               )}
             </Pressable>
-          </ThemedView>
+          </View>
 
-          <ThemedText style={styles.copy}>
+          <ThemedText style={[styles.copy, { color: subtleText }]}>
             © {new Date().getFullYear()} Finly
           </ThemedText>
-        </ThemedView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -375,7 +405,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
     marginBottom: 6,
   },
   logoText: { fontSize: 22, fontWeight: "900" },
@@ -386,7 +415,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
 
   label: { fontWeight: "800", marginBottom: 8 },
@@ -399,7 +427,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
   input: { flex: 1 },
 
@@ -417,14 +444,13 @@ const styles = StyleSheet.create({
   btnSolid: {
     paddingVertical: 13,
     borderRadius: 16,
-    backgroundColor: "#111",
     alignItems: "center",
   },
-  btnSolidText: { color: "#fff", fontWeight: "900" },
+  btnSolidText: { fontWeight: "900" },
   btnDisabled: { opacity: 0.6 },
 
   divider: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 14 },
-  line: { flex: 1, height: 1, backgroundColor: "rgba(127,127,127,0.25)" },
+  line: { flex: 1, height: 1 },
 
   btnOutline: {
     paddingVertical: 12,
@@ -434,7 +460,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
   btnOutlineText: { fontWeight: "900" },
 

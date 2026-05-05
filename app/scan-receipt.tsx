@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAppColorScheme } from '@/contexts/ThemeContext';
 import { findCategoryId, parseReceiptText, type ReceiptData } from '@/lib/receiptOCR';
 import { supabase } from '@/lib/supabase';
 import { recognizeText } from '@/lib/textRecognition';
@@ -34,6 +35,19 @@ type Category = {
 export default function ScanReceiptScreen() {
   const router = useRouter();
   const cameraRef = useRef<CameraView>(null);
+  
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const modalBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#333333';
+  const inputBg = isDark ? '#374151' : '#ffffff';
+  const inputBorder = isDark ? '#4b5563' : '#dddddd';
+  const categoryBg = isDark ? '#374151' : '#f0f0f0';
+  const categorySelectedBg = '#007AFF';
+  const cancelBg = isDark ? '#374151' : '#f0f0f0';
+  const cancelText = isDark ? '#f9fafb' : '#333333';
   
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraReady, setCameraReady] = useState(false);
@@ -272,45 +286,49 @@ export default function ScanReceiptScreen() {
       {/* Modal xác nhận */}
       <Modal visible={showConfirm} animationType="slide" transparent>
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={[styles.modalContent, { backgroundColor: modalBg }]}>
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalTitle}>Xác nhận thông tin</Text>
+              <Text style={[styles.modalTitle, { color: text }]}>Xác nhận thông tin</Text>
               
               {capturedImage && (
                 <Image source={{ uri: capturedImage }} style={styles.preview} />
               )}
               
-              <Text style={styles.label}>Số tiền *</Text>
+              <Text style={[styles.label, { color: text }]}>Số tiền *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: inputBg, borderColor: inputBorder, color: text }]}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
                 placeholder="Nhập số tiền"
+                placeholderTextColor={isDark ? '#9ca3af' : '#999999'}
               />
               
-              <Text style={styles.label}>Ghi chú</Text>
+              <Text style={[styles.label, { color: text }]}>Ghi chú</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: inputBg, borderColor: inputBorder, color: text }]}
                 value={note}
                 onChangeText={setNote}
                 placeholder="Tên cửa hàng, mô tả..."
+                placeholderTextColor={isDark ? '#9ca3af' : '#999999'}
               />
               
-              <Text style={styles.label}>Danh mục *</Text>
+              <Text style={[styles.label, { color: text }]}>Danh mục *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
                 {categories.map(cat => (
                   <Pressable
                     key={cat.id}
                     style={[
                       styles.categoryChip,
-                      selectedCategoryId === cat.id && styles.categoryChipSelected
+                      { backgroundColor: categoryBg },
+                      selectedCategoryId === cat.id && { backgroundColor: categorySelectedBg }
                     ]}
                     onPress={() => setSelectedCategoryId(cat.id)}
                   >
                     <Text style={styles.categoryEmoji}>{cat.emoji || '📁'}</Text>
                     <Text style={[
                       styles.categoryName,
+                      { color: text },
                       selectedCategoryId === cat.id && styles.categoryNameSelected
                     ]}>
                       {cat.name}
@@ -320,14 +338,14 @@ export default function ScanReceiptScreen() {
               </ScrollView>
               
               {receiptData?.category && (
-                <Text style={styles.hint}>
+                <Text style={[styles.hint, { color: isDark ? '#9ca3af' : '#666666' }]}>
                   💡 Gợi ý: {receiptData.category}
                 </Text>
               )}
               
               <View style={styles.modalButtons}>
                 <Pressable
-                  style={[styles.modalButton, styles.cancelButton]}
+                  style={[styles.modalButton, styles.cancelButton, { backgroundColor: cancelBg }]}
                   onPress={() => {
                     setShowConfirm(false);
                     setCapturedImage(null);
@@ -337,7 +355,7 @@ export default function ScanReceiptScreen() {
                     setSelectedCategoryId(null);
                   }}
                 >
-                  <Text style={styles.cancelButtonText}>Hủy</Text>
+                  <Text style={[styles.cancelButtonText, { color: cancelText }]}>Hủy</Text>
                 </Pressable>
                 
                 <Pressable
@@ -497,7 +515,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 20,
@@ -519,11 +536,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
@@ -538,11 +553,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
     marginRight: 8,
-  },
-  categoryChipSelected: {
-    backgroundColor: '#007AFF',
   },
   categoryEmoji: {
     fontSize: 18,
@@ -550,7 +561,6 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 14,
-    color: '#333',
   },
   categoryNameSelected: {
     color: '#fff',
@@ -558,7 +568,6 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 14,
-    color: '#666',
     fontStyle: 'italic',
     marginBottom: 16,
   },
@@ -573,11 +582,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
+  cancelButton: {},
   cancelButtonText: {
-    color: '#333',
     fontSize: 16,
     fontWeight: '600',
   },

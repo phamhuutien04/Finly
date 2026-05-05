@@ -2,7 +2,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { LogBox } from 'react-native';
+import { LogBox, Platform } from 'react-native';
 import 'react-native-reanimated';
 
 import GlobalAlertProvider from '@/components/GlobalAlertProvider';
@@ -11,6 +11,23 @@ import { supabase } from '@/lib/supabase';
 
 // Tắt tất cả warnings và errors trên màn hình
 LogBox.ignoreAllLogs(true);
+
+// Fix autofill styling on web
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = `
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus,
+    input:-webkit-autofill:active {
+      -webkit-background-clip: text !important;
+      -webkit-text-fill-color: inherit !important;
+      transition: background-color 5000s ease-in-out 0s !important;
+      box-shadow: inset 0 0 20px 20px transparent !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export const unstable_settings = {
   anchor: '(tabs)',
