@@ -226,7 +226,7 @@ export default function SettingsScreen() {
 
       setSepayApiKey(sepayApiKeyInput.trim()); // Update main state after successful save
       setShowSepayModal(false);
-      showSuccess('Thành công', 'Đã lưu Sepay API key');
+      // Removed success notification
     } catch (err: any) {
       showError('Lỗi', err.message);
     } finally {
@@ -261,7 +261,7 @@ export default function SettingsScreen() {
           }
 
           setSepayApiKey('');
-          showSuccess('Thành công', 'Đã xoá API key');
+          // Removed success notification
         } catch (err: any) {
           showError('Lỗi', err.message);
         }
