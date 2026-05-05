@@ -95,6 +95,7 @@ export default function SettingsScreen() {
   // Sepay API key states
   const [showSepayModal, setShowSepayModal] = useState(false);
   const [sepayApiKey, setSepayApiKey] = useState('');
+  const [sepayApiKeyInput, setSepayApiKeyInput] = useState(''); // Separate state for modal input
   const [savingSepayKey, setSavingSepayKey] = useState(false);
   const [syncingSepay, setSyncingSepay] = useState(false);
 
@@ -197,7 +198,7 @@ export default function SettingsScreen() {
 
   // Save Sepay API key
   const saveSepayApiKey = async () => {
-    if (!sepayApiKey.trim()) {
+    if (!sepayApiKeyInput.trim()) {
       showWarning('Lỗi', 'Vui lòng nhập API key');
       return;
     }
@@ -214,7 +215,7 @@ export default function SettingsScreen() {
       const { error } = await supabase
         .from('user_profiles')
         .update({
-          sepay_api_key: sepayApiKey.trim(),
+          sepay_api_key: sepayApiKeyInput.trim(),
         })
         .eq('user_id', user.id);
 
@@ -223,6 +224,7 @@ export default function SettingsScreen() {
         return;
       }
 
+      setSepayApiKey(sepayApiKeyInput.trim()); // Update main state after successful save
       setShowSepayModal(false);
       showSuccess('Thành công', 'Đã lưu Sepay API key');
     } catch (err: any) {
@@ -560,7 +562,7 @@ export default function SettingsScreen() {
               {loadingProfile ? 'Đang tải...' : (currentUser?.display_name || currentUser?.email || 'Người dùng')}
             </ThemedText>
             <ThemedText style={{ ...styles.muted, color: subtleText }}>
-              {currentUser?.email || 'Chưa có email'} • {Platform.OS.toUpperCase()}
+              {currentUser?.email || 'Chưa có email'}
             </ThemedText>
             {currentUser?.phone && (
               <ThemedText style={{ ...styles.muted, color: subtleText }}>
@@ -580,13 +582,16 @@ export default function SettingsScreen() {
           </Pressable>
         </ThemedView>
 
-        <Section title="Tuỳ chọn" borderColor={borderColor}>
+        <Section title="Tuỳ chọn" borderColor={borderColor} cardBg={cardBg}>
           <RowSwitch
             title="Dark Mode"
             subtitle="Giao diện tối dễ nhìn ban đêm"
             value={darkMode}
             onValueChange={handleDarkModeToggle}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowSwitch
             title="Thông báo đẩy"
@@ -594,6 +599,9 @@ export default function SettingsScreen() {
             value={pushNoti}
             onValueChange={setPushNoti}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowSwitch
             title="Báo cáo tuần"
@@ -601,43 +609,64 @@ export default function SettingsScreen() {
             value={weeklyReport}
             onValueChange={setWeeklyReport}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowPress
             title="Ngôn ngữ"
             subtitle={language.label}
             onPress={() => pickOption("Chọn ngôn ngữ", languages, language, setLanguage)}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowPress
             title="Tiền tệ"
             subtitle={currency.label}
             onPress={() => pickOption("Chọn tiền tệ", currencies, currency, setCurrency)}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
         </Section>
 
-        <Section title="Bảo mật" borderColor={borderColor}>
+        <Section title="Bảo mật" borderColor={borderColor} cardBg={cardBg}>
           <RowSwitch
             title="Mở khoá sinh trắc học"
             subtitle="Vân tay / FaceID (nếu thiết bị hỗ trợ)"
             value={biometric}
             onValueChange={setBiometric}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowPress
             title="Đổi mã PIN"
             subtitle="Thiết lập PIN để mở app"
             onPress={() => showInfo("PIN", "Gắn màn hình đổi PIN vào đây.")}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
         </Section>
 
-        <Section title="Tích hợp API" borderColor={borderColor}>
+        <Section title="Tích hợp API" borderColor={borderColor} cardBg={cardBg}>
           <RowPress
             title="API Key"
             subtitle={sepayApiKey ? '••••••••' + sepayApiKey.slice(-4) : 'Chưa cài đặt'}
-            onPress={() => setShowSepayModal(true)}
+            onPress={() => {
+              setSepayApiKeyInput(sepayApiKey); // Copy current value to input
+              setShowSepayModal(true);
+            }}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           {sepayApiKey && (
             <>
@@ -646,48 +675,65 @@ export default function SettingsScreen() {
                 subtitle="Tự động phân loại chi tiêu"
                 onPress={handleSyncSepay}
                 borderColor={borderColor}
+                subtleText={subtleText}
+                cardBg={cardBg}
+                text={text}
               />
               <RowDanger
                 title="Xoá API Key"
                 subtitle="Xoá key đã lưu"
                 onPress={removeSepayApiKey}
                 borderColor={borderColor}
+                subtleText={subtleText}
+                cardBg={cardBg}
               />
             </>
           )}
         </Section>
 
-        <Section title="Dữ liệu" borderColor={borderColor}>
+        <Section title="Dữ liệu" borderColor={borderColor} cardBg={cardBg}>
           <RowPress
             title="Sao lưu dữ liệu"
             subtitle="Xuất dữ liệu ra file Excel"
             onPress={() => setShowExportModal(true)}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowPress
             title="Khôi phục dữ liệu"
             subtitle="Nhập lại từ bản sao lưu"
             onPress={() => showInfo("Restore", "Import CSV/JSON ở đây.")}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
         </Section>
 
-        <Section title="Thông tin" borderColor={borderColor}>
+        <Section title="Thông tin" borderColor={borderColor} cardBg={cardBg}>
           <RowPress
             title="Giới thiệu"
             subtitle="Phiên bản 1.0.0"
             onPress={() => showInfo("About", "App quản lí chi tiêu • Finly")}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
           <RowPress
             title="Điều khoản & Chính sách"
             subtitle="Xem nội dung"
             onPress={() => showInfo("Policy", "Mở trang Terms/Privacy ở đây.")}
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
+            text={text}
           />
         </Section>
 
-        <Section title="Khu vực nguy hiểm" danger borderColor={borderColor}>
+        <Section title="Khu vực nguy hiểm" danger borderColor={borderColor} cardBg={cardBg}>
           <RowDanger
             title="Xoá toàn bộ dữ liệu"
             subtitle="Không thể khôi phục"
@@ -697,6 +743,8 @@ export default function SettingsScreen() {
               )
             }
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
           />
           <RowDanger
             title="Đăng xuất"
@@ -721,6 +769,8 @@ export default function SettingsScreen() {
               })
             }
             borderColor={borderColor}
+            subtleText={subtleText}
+            cardBg={cardBg}
           />
         </Section>
 
@@ -837,8 +887,8 @@ export default function SettingsScreen() {
                     styles.input,
                     { borderColor: borderColor, backgroundColor: inputBg, color: text }
                   ]}
-                  value={sepayApiKey}
-                  onChangeText={setSepayApiKey}
+                  value={sepayApiKeyInput}
+                  onChangeText={setSepayApiKeyInput}
                   placeholder="Nhập Sepay API key"
                   placeholderTextColor={subtleText}
                   autoCapitalize="none"
@@ -990,11 +1040,13 @@ function Section({
   danger,
   children,
   borderColor,
+  cardBg,
 }: {
   title: string;
   danger?: boolean;
   children: React.ReactNode;
   borderColor: string;
+  cardBg: string;
 }) {
   return (
     <View style={styles.section}>
@@ -1002,7 +1054,7 @@ function Section({
         {title}
       </ThemedText>
 
-      <ThemedView style={{ ...styles.card, borderColor }}>{children}</ThemedView>
+      <View style={{ ...styles.card, borderColor, backgroundColor: cardBg }}>{children}</View>
     </View>
   );
 }
@@ -1013,21 +1065,27 @@ function RowSwitch({
   value,
   onValueChange,
   borderColor,
+  subtleText,
+  cardBg,
+  text,
 }: {
   title: string;
   subtitle?: string;
   value: boolean;
   onValueChange: (v: boolean) => void;
   borderColor: string;
+  subtleText?: string;
+  cardBg: string;
+  text: string;
 }) {
   return (
-    <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
+    <View style={{ ...styles.row, borderTopColor: borderColor, backgroundColor: cardBg }}>
       <View style={{ flex: 1 }}>
-        <ThemedText style={styles.rowTitle}>{title}</ThemedText>
-        {!!subtitle && <ThemedText style={styles.rowSub}>{subtitle}</ThemedText>}
+        <ThemedText style={[styles.rowTitle, { color: text }]}>{title}</ThemedText>
+        {!!subtitle && <ThemedText style={[styles.rowSub, { color: subtleText }]}>{subtitle}</ThemedText>}
       </View>
       <Switch value={value} onValueChange={onValueChange} />
-    </ThemedView>
+    </View>
   );
 }
 
@@ -1036,21 +1094,27 @@ function RowPress({
   subtitle,
   onPress,
   borderColor,
+  subtleText,
+  cardBg,
+  text,
 }: {
   title: string;
   subtitle?: string;
   onPress: () => void;
   borderColor: string;
+  subtleText?: string;
+  cardBg: string;
+  text: string;
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.75 }]}>
-      <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
+      <View style={{ ...styles.row, borderTopColor: borderColor, backgroundColor: cardBg }}>
         <View style={{ flex: 1 }}>
-          <ThemedText style={styles.rowTitle}>{title}</ThemedText>
-          {!!subtitle && <ThemedText style={styles.rowSub}>{subtitle}</ThemedText>}
+          <ThemedText style={[styles.rowTitle, { color: text }]}>{title}</ThemedText>
+          {!!subtitle && <ThemedText style={[styles.rowSub, { color: subtleText }]}>{subtitle}</ThemedText>}
         </View>
-        <ThemedText style={styles.chev}>›</ThemedText>
-      </ThemedView>
+        <ThemedText style={[styles.chev, { color: text }]}>›</ThemedText>
+      </View>
     </Pressable>
   );
 }
@@ -1060,21 +1124,25 @@ function RowDanger({
   subtitle,
   onPress,
   borderColor,
+  subtleText,
+  cardBg,
 }: {
   title: string;
   subtitle?: string;
   onPress: () => void;
   borderColor: string;
+  subtleText?: string;
+  cardBg: string;
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.75 }]}>
-      <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
+      <View style={{ ...styles.row, borderTopColor: borderColor, backgroundColor: cardBg }}>
         <View style={{ flex: 1 }}>
           <ThemedText style={[styles.rowTitle, { color: "#DC2626" }]}>{title}</ThemedText>
-          {!!subtitle && <ThemedText style={[styles.rowSub, { color: "#DC2626" }]}>{subtitle}</ThemedText>}
+          {!!subtitle && <ThemedText style={[styles.rowSub, { color: subtleText || "#DC2626" }]}>{subtitle}</ThemedText>}
         </View>
         <ThemedText style={[styles.chev, { color: "#DC2626" }]}>›</ThemedText>
-      </ThemedView>
+      </View>
     </Pressable>
   );
 }
@@ -1251,7 +1319,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   exportModalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingTop: 8,
@@ -1261,7 +1328,6 @@ const styles = StyleSheet.create({
   exportModalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: 'rgba(127,127,127,0.3)',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
@@ -1274,7 +1340,6 @@ const styles = StyleSheet.create({
   },
   exportModalSubtitle: {
     fontSize: 14,
-    opacity: 0.6,
     textAlign: 'center',
     marginBottom: 24,
     textTransform: 'uppercase',
@@ -1327,7 +1392,6 @@ const styles = StyleSheet.create({
   },
   exportOptionDesc: {
     fontSize: 12,
-    opacity: 0.6,
     textAlign: 'center',
     fontWeight: '500',
   },
@@ -1370,7 +1434,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: '#3B82F6',
     alignItems: 'center',
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
