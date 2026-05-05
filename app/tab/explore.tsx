@@ -6,20 +6,36 @@ import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Appearance,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 
 // Chỉ import DateTimePicker khi không phải web
 let DateTimePicker: any = null;
 if (Platform.OS !== "web") {
   DateTimePicker = require("@react-native-community/datetimepicker").default;
+}
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
 }
 
 type Category = {
@@ -34,12 +50,41 @@ export default function BudgetFormScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#F8F9FA';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1F2937';
+  const subtleText = isDark ? '#9ca3af' : '#6B7280';
+  const borderColor = isDark ? '#374151' : '#E5E7EB';
+  const inputBg = isDark ? '#1f2937' : '#F9FAFB';
+  const accentColor = '#EF4444';
+  const accentLight = isDark ? '#7f1d1d' : '#FEF2F2';
+  const accentBorder = isDark ? '#991b1b' : '#FEE2E2';
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
 
   const [amount, setAmount] = useState('');
   const [period, setPeriod] = useState<PeriodType>('monthly');
+
+  // Format number with thousand separators
+  const formatNumber = (value: string) => {
+    // Remove all non-digit characters
+    const numbers = value.replace(/[^\d]/g, '');
+    if (!numbers) return '';
+    
+    // Add thousand separators
+    return parseInt(numbers, 10).toLocaleString('vi-VN');
+  };
+
+  const handleAmountChange = (text: string) => {
+    const formatted = formatNumber(text);
+    setAmount(formatted);
+  };
 
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date());
@@ -223,7 +268,8 @@ export default function BudgetFormScreen() {
       if (!data) return showAlert('Lỗi', 'Không tìm thấy ngân sách', 'error');
 
       setSelectedCategoryId(data.category_id);
-      setAmount(data.amount.toString());
+      // Format amount with thousand separators
+      setAmount(data.amount.toLocaleString('vi-VN'));
       setPeriod(data.period as PeriodType);
       setStartDate(new Date(data.start_date));
       setEndDate(new Date(data.end_date));
@@ -233,7 +279,10 @@ export default function BudgetFormScreen() {
   };
 
   const handleSave = async () => {
-    if (!amount || Number(amount) <= 0) {
+    // Parse amount by removing dots (thousand separators)
+    const parsedAmount = amount.replace(/\./g, '');
+    
+    if (!parsedAmount || Number(parsedAmount) <= 0) {
       return showAlert('Lỗi', 'Số tiền phải lớn hơn 0', 'error');
     }
     if (!selectedCategoryId) {
@@ -257,7 +306,7 @@ export default function BudgetFormScreen() {
     const payload = {
       user_id: session.user.id,
       category_id: selectedCategoryId,
-      amount: Number(amount),
+      amount: Number(parsedAmount),
       period: dbPeriod,
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
@@ -289,22 +338,22 @@ export default function BudgetFormScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: screenBg }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 16, paddingBottom: 32 }}>
         {/* Categories */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Chọn hạng mục chi tiêu</ThemedText>
+        <View style={[styles.section, { backgroundColor: cardBg }]}>
+          <ThemedText style={[styles.sectionTitle, { color: text }]}>Chọn hạng mục chi tiêu</ThemedText>
           
           {loadingCategories ? (
             <View style={styles.centerLoading}>
-              <ActivityIndicator size="large" color="#ef4444" />
-              <ThemedText style={styles.loadingText}>Đang tải...</ThemedText>
+              <ActivityIndicator size="large" color={accentColor} />
+              <ThemedText style={[styles.loadingText, { color: subtleText }]}>Đang tải...</ThemedText>
             </View>
           ) : categories.length === 0 ? (
             <View style={styles.centerEmpty}>
               <Text style={styles.emptyIcon}>📁</Text>
-              <ThemedText style={styles.emptyText}>Chưa có hạng mục nào</ThemedText>
-              <ThemedText style={styles.emptySubtext}>
+              <ThemedText style={[styles.emptyText, { color: subtleText }]}>Chưa có hạng mục nào</ThemedText>
+              <ThemedText style={[styles.emptySubtext, { color: subtleText }]}>
                 Tạo hạng mục chi tiêu trong mục "Danh mục"
               </ThemedText>
             </View>
@@ -317,7 +366,8 @@ export default function BudgetFormScreen() {
                     key={cat.id}
                     style={[
                       styles.categoryItem,
-                      isSelected && styles.categoryItemSelected,
+                      { backgroundColor: accentLight, borderColor: accentBorder },
+                      isSelected && { backgroundColor: accentColor, borderColor: '#DC2626' },
                     ]}
                     onPress={() => setSelectedCategoryId(cat.id)}
                   >
@@ -326,6 +376,7 @@ export default function BudgetFormScreen() {
                     <ThemedText
                       style={[
                         styles.categoryText,
+                        { color: isDark ? '#f9fafb' : '#DC2626' },
                         isSelected && { color: '#fff' },
                       ]}
                       numberOfLines={1}
@@ -340,34 +391,35 @@ export default function BudgetFormScreen() {
         </View>
 
         {/* Amount */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Giới hạn chi tiêu</ThemedText>
-          <View style={styles.amountInputContainer}>
-            <Text style={styles.currencyLabel}>VNĐ</Text>
+        <View style={[styles.section, { backgroundColor: cardBg }]}>
+          <ThemedText style={[styles.sectionTitle, { color: text }]}>Giới hạn chi tiêu</ThemedText>
+          <View style={[styles.amountInputContainer, { borderColor: borderColor, backgroundColor: inputBg }]}>
+            <Text style={[styles.currencyLabel, { backgroundColor: accentColor }]}>VNĐ</Text>
             <TextInput
-              style={styles.amountInput}
+              style={[styles.amountInput, { color: text }]}
               value={amount}
-              onChangeText={setAmount}
+              onChangeText={handleAmountChange}
               keyboardType="numeric"
               placeholder="Nhập số tiền"
-              placeholderTextColor="#999"
+              placeholderTextColor={subtleText}
             />
           </View>
         </View>
 
         {/* Period Selection */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Chu kỳ</ThemedText>
+        <View style={[styles.section, { backgroundColor: cardBg }]}>
+          <ThemedText style={[styles.sectionTitle, { color: text }]}>Chu kỳ</ThemedText>
           
           <View style={styles.periodRow}>
             <TouchableOpacity
               style={[
                 styles.periodBtn,
-                period === 'daily' && styles.periodBtnActive,
+                { backgroundColor: inputBg, borderColor: borderColor },
+                period === 'daily' && { backgroundColor: accentColor, borderColor: '#DC2626' },
               ]}
               onPress={() => handlePeriodChange('daily')}
             >
-              <Text style={[styles.periodBtnText, period === 'daily' && styles.periodBtnTextActive]}>
+              <Text style={[styles.periodBtnText, { color: subtleText }, period === 'daily' && styles.periodBtnTextActive]}>
                 Ngày
               </Text>
             </TouchableOpacity>
@@ -375,11 +427,12 @@ export default function BudgetFormScreen() {
             <TouchableOpacity
               style={[
                 styles.periodBtn,
-                period === 'weekly' && styles.periodBtnActive,
+                { backgroundColor: inputBg, borderColor: borderColor },
+                period === 'weekly' && { backgroundColor: accentColor, borderColor: '#DC2626' },
               ]}
               onPress={() => handlePeriodChange('weekly')}
             >
-              <Text style={[styles.periodBtnText, period === 'weekly' && styles.periodBtnTextActive]}>
+              <Text style={[styles.periodBtnText, { color: subtleText }, period === 'weekly' && styles.periodBtnTextActive]}>
                 Tuần
               </Text>
             </TouchableOpacity>
@@ -387,11 +440,12 @@ export default function BudgetFormScreen() {
             <TouchableOpacity
               style={[
                 styles.periodBtn,
-                period === 'monthly' && styles.periodBtnActive,
+                { backgroundColor: inputBg, borderColor: borderColor },
+                period === 'monthly' && { backgroundColor: accentColor, borderColor: '#DC2626' },
               ]}
               onPress={() => handlePeriodChange('monthly')}
             >
-              <Text style={[styles.periodBtnText, period === 'monthly' && styles.periodBtnTextActive]}>
+              <Text style={[styles.periodBtnText, { color: subtleText }, period === 'monthly' && styles.periodBtnTextActive]}>
                 Tháng
               </Text>
             </TouchableOpacity>
@@ -399,11 +453,12 @@ export default function BudgetFormScreen() {
             <TouchableOpacity
               style={[
                 styles.periodBtn,
-                period === 'custom' && styles.periodBtnActive,
+                { backgroundColor: inputBg, borderColor: borderColor },
+                period === 'custom' && { backgroundColor: accentColor, borderColor: '#DC2626' },
               ]}
               onPress={() => handlePeriodChange('custom')}
             >
-              <Text style={[styles.periodBtnText, period === 'custom' && styles.periodBtnTextActive]}>
+              <Text style={[styles.periodBtnText, { color: subtleText }, period === 'custom' && styles.periodBtnTextActive]}>
                 Tùy chỉnh
               </Text>
             </TouchableOpacity>
@@ -412,8 +467,8 @@ export default function BudgetFormScreen() {
 
         {/* Preset Options */}
         {period !== 'custom' && (
-          <View style={styles.section}>
-            <ThemedText style={styles.sectionTitle}>Chọn khoảng thời gian</ThemedText>
+          <View style={[styles.section, { backgroundColor: cardBg }]}>
+            <ThemedText style={[styles.sectionTitle, { color: text }]}>Chọn khoảng thời gian</ThemedText>
             
             <View style={styles.presetRow}>
               {(period === 'weekly' || period === 'monthly') && (
@@ -421,12 +476,14 @@ export default function BudgetFormScreen() {
                   <TouchableOpacity
                     style={[
                       styles.presetBtn,
-                      presetOption === `this_${period}` && styles.presetBtnActive,
+                      { backgroundColor: inputBg, borderColor: borderColor },
+                      presetOption === `this_${period}` && { backgroundColor: accentColor, borderColor: '#DC2626' },
                     ]}
                     onPress={() => handlePresetChange(period === 'weekly' ? 'this_week' : 'this_month')}
                   >
                     <Text style={[
                       styles.presetBtnText,
+                      { color: subtleText },
                       presetOption === `this_${period}` && styles.presetBtnTextActive
                     ]}>
                       {period === 'weekly' ? 'Tuần này' : 'Tháng này'}
@@ -436,12 +493,14 @@ export default function BudgetFormScreen() {
                   <TouchableOpacity
                     style={[
                       styles.presetBtn,
-                      presetOption === `next_${period}` && styles.presetBtnActive,
+                      { backgroundColor: inputBg, borderColor: borderColor },
+                      presetOption === `next_${period}` && { backgroundColor: accentColor, borderColor: '#DC2626' },
                     ]}
                     onPress={() => handlePresetChange(period === 'weekly' ? 'next_week' : 'next_month')}
                   >
                     <Text style={[
                       styles.presetBtnText,
+                      { color: subtleText },
                       presetOption === `next_${period}` && styles.presetBtnTextActive
                     ]}>
                       {period === 'weekly' ? 'Tuần sau' : 'Tháng sau'}
@@ -454,29 +513,29 @@ export default function BudgetFormScreen() {
         )}
 
         {/* Date Range */}
-        <View style={styles.section}>
-          <ThemedText style={styles.sectionTitle}>Khoảng thời gian</ThemedText>
+        <View style={[styles.section, { backgroundColor: cardBg }]}>
+          <ThemedText style={[styles.sectionTitle, { color: text }]}>Khoảng thời gian</ThemedText>
           
           <View style={styles.dateRangeContainer}>
             <View style={styles.dateBox}>
-              <Text style={styles.dateLabel}>Từ ngày</Text>
+              <Text style={[styles.dateLabel, { color: subtleText }]}>Từ ngày</Text>
               <TouchableOpacity 
-                style={styles.dateButton}
+                style={[styles.dateButton, { backgroundColor: inputBg, borderColor: borderColor }]}
                 onPress={() => setShowStartPicker(true)}
               >
-                <Text style={styles.dateText}>{formatDate(startDate)}</Text>
+                <Text style={[styles.dateText, { color: text }]}>{formatDate(startDate)}</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.dateArrow}>→</Text>
+            <Text style={[styles.dateArrow, { color: accentColor }]}>→</Text>
 
             <View style={styles.dateBox}>
-              <Text style={styles.dateLabel}>Đến ngày</Text>
+              <Text style={[styles.dateLabel, { color: subtleText }]}>Đến ngày</Text>
               <TouchableOpacity 
-                style={styles.dateButton}
+                style={[styles.dateButton, { backgroundColor: inputBg, borderColor: borderColor }]}
                 onPress={() => setShowEndPicker(true)}
               >
-                <Text style={styles.dateText}>{formatDate(endDate)}</Text>
+                <Text style={[styles.dateText, { color: text }]}>{formatDate(endDate)}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -517,8 +576,8 @@ export default function BudgetFormScreen() {
           {/* Web Date Pickers */}
           {Platform.OS === 'web' && showStartPicker && (
             <View style={styles.webDatePicker}>
-              <View style={styles.webDatePickerContent}>
-                <ThemedText style={[styles.sectionTitle, { marginBottom: 12 }]}>Chọn ngày bắt đầu</ThemedText>
+              <View style={[styles.webDatePickerContent, { backgroundColor: cardBg }]}>
+                <ThemedText style={[styles.sectionTitle, { marginBottom: 12, color: text }]}>Chọn ngày bắt đầu</ThemedText>
                 
                 <input
                   type="date"
@@ -539,24 +598,26 @@ export default function BudgetFormScreen() {
                     paddingTop: 12,
                     paddingBottom: 12,
                     borderWidth: 1,
-                    borderColor: '#E0E0E0',
+                    borderColor: borderColor,
                     marginBottom: 12,
                     width: '100%',
+                    backgroundColor: inputBg,
+                    color: text,
                   }}
                 />
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={() => setShowStartPicker(false)}
-                    style={[styles.saveButton, { flex: 1, backgroundColor: '#ef4444' }]}
+                    style={[styles.saveButton, { flex: 1, backgroundColor: accentColor }]}
                   >
                     <Text style={styles.saveButtonText}>Xác nhận</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowStartPicker(false)}
-                    style={[styles.cancelButton, { flex: 1 }]}
+                    style={[styles.cancelButton, { flex: 1, borderColor: borderColor, backgroundColor: cardBg }]}
                   >
-                    <Text style={styles.cancelButtonText}>Hủy</Text>
+                    <Text style={[styles.cancelButtonText, { color: subtleText }]}>Hủy</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -565,8 +626,8 @@ export default function BudgetFormScreen() {
 
           {Platform.OS === 'web' && showEndPicker && (
             <View style={styles.webDatePicker}>
-              <View style={styles.webDatePickerContent}>
-                <ThemedText style={[styles.sectionTitle, { marginBottom: 12 }]}>Chọn ngày kết thúc</ThemedText>
+              <View style={[styles.webDatePickerContent, { backgroundColor: cardBg }]}>
+                <ThemedText style={[styles.sectionTitle, { marginBottom: 12, color: text }]}>Chọn ngày kết thúc</ThemedText>
                 
                 <input
                   type="date"
@@ -587,24 +648,26 @@ export default function BudgetFormScreen() {
                     paddingTop: 12,
                     paddingBottom: 12,
                     borderWidth: 1,
-                    borderColor: '#E0E0E0',
+                    borderColor: borderColor,
                     marginBottom: 12,
                     width: '100%',
+                    backgroundColor: inputBg,
+                    color: text,
                   }}
                 />
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <TouchableOpacity
                     onPress={() => setShowEndPicker(false)}
-                    style={[styles.saveButton, { flex: 1, backgroundColor: '#ef4444' }]}
+                    style={[styles.saveButton, { flex: 1, backgroundColor: accentColor }]}
                   >
                     <Text style={styles.saveButtonText}>Xác nhận</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => setShowEndPicker(false)}
-                    style={[styles.cancelButton, { flex: 1 }]}
+                    style={[styles.cancelButton, { flex: 1, borderColor: borderColor, backgroundColor: cardBg }]}
                   >
-                    <Text style={styles.cancelButtonText}>Hủy</Text>
+                    <Text style={[styles.cancelButtonText, { color: subtleText }]}>Hủy</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -614,34 +677,34 @@ export default function BudgetFormScreen() {
 
         {/* Summary */}
         {selectedCategoryId && amount && (
-          <View style={styles.summarySection}>
-            <ThemedText style={styles.summaryTitle}>Tóm tắt</ThemedText>
+          <View style={[styles.summarySection, { backgroundColor: accentLight, borderColor: accentBorder }]}>
+            <ThemedText style={[styles.summaryTitle, { color: isDark ? '#f9fafb' : '#DC2626' }]}>Tóm tắt</ThemedText>
             
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Hạng mục:</ThemedText>
-              <ThemedText style={styles.summaryValue}>
+            <View style={[styles.summaryRow, { borderBottomColor: accentBorder }]}>
+              <ThemedText style={[styles.summaryLabel, { color: subtleText }]}>Hạng mục:</ThemedText>
+              <ThemedText style={[styles.summaryValue, { color: text }]}>
                 {categories.find(c => c.id === selectedCategoryId)?.name || 'Đã chọn'}
               </ThemedText>
             </View>
 
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Giới hạn:</ThemedText>
-              <ThemedText style={styles.summaryValue}>
-                {Number(amount).toLocaleString()} VNĐ
+            <View style={[styles.summaryRow, { borderBottomColor: accentBorder }]}>
+              <ThemedText style={[styles.summaryLabel, { color: subtleText }]}>Giới hạn:</ThemedText>
+              <ThemedText style={[styles.summaryValue, { color: text }]}>
+                {amount} VNĐ
               </ThemedText>
             </View>
 
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Thời gian:</ThemedText>
-              <ThemedText style={styles.summaryValue}>
+            <View style={[styles.summaryRow, { borderBottomColor: accentBorder }]}>
+              <ThemedText style={[styles.summaryLabel, { color: subtleText }]}>Thời gian:</ThemedText>
+              <ThemedText style={[styles.summaryValue, { color: text }]}>
                 {Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))} ngày
               </ThemedText>
             </View>
 
-            <View style={styles.summaryRow}>
-              <ThemedText style={styles.summaryLabel}>Trung bình/ngày:</ThemedText>
-              <ThemedText style={styles.summaryValue}>
-                {Math.round(Number(amount) / Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))).toLocaleString()} VNĐ
+            <View style={[styles.summaryRow, { borderBottomColor: accentBorder }]}>
+              <ThemedText style={[styles.summaryLabel, { color: subtleText }]}>Trung bình/ngày:</ThemedText>
+              <ThemedText style={[styles.summaryValue, { color: text }]}>
+                {Math.round(Number(amount.replace(/\./g, '')) / Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))).toLocaleString('vi-VN')} VNĐ
               </ThemedText>
             </View>
           </View>
@@ -651,6 +714,7 @@ export default function BudgetFormScreen() {
         <TouchableOpacity
           style={[
             styles.saveButton,
+            { backgroundColor: accentColor },
             (saving || loadingCategories) && styles.saveButtonDisabled
           ]}
           onPress={handleSave}
@@ -684,10 +748,8 @@ export default function BudgetFormScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
   },
   section: {
-    backgroundColor: '#FFF',
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 16,
@@ -702,7 +764,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 16,
-    color: '#1F2937',
   },
   centerLoading: {
     padding: 40,
@@ -710,7 +771,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6B7280',
     fontSize: 14,
   },
   centerEmpty: {
@@ -723,13 +783,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    color: '#6B7280',
     marginTop: 8,
     fontWeight: '600',
   },
   emptySubtext: {
     fontSize: 13,
-    color: '#9CA3AF',
     marginTop: 6,
     textAlign: 'center',
   },
@@ -745,13 +803,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 16,
-    backgroundColor: '#FEF2F2',
     borderWidth: 2,
-    borderColor: '#FEE2E2',
   },
   categoryItemSelected: {
-    backgroundColor: '#EF4444',
-    borderColor: '#DC2626',
   },
   categoryIcon: {
     fontSize: 18,
@@ -759,21 +813,17 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#DC2626',
   },
   amountInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#F9FAFB',
   },
   currencyLabel: {
     paddingHorizontal: 18,
     paddingVertical: 16,
-    backgroundColor: '#EF4444',
     color: '#FFF',
     fontWeight: '700',
     fontSize: 15,
@@ -783,7 +833,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     fontSize: 16,
-    color: '#1F2937',
     fontWeight: '600',
   },
   periodRow: {
@@ -795,18 +844,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
-    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
   },
   periodBtnActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#DC2626',
   },
   periodBtnText: {
     fontSize: 15,
-    color: '#6B7280',
     fontWeight: '600',
   },
   periodBtnTextActive: {
@@ -820,20 +864,15 @@ const styles = StyleSheet.create({
   presetBtn: {
     flex: 1,
     paddingVertical: 14,
-    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
   },
   presetBtnActive: {
-    backgroundColor: '#EF4444',
-    borderColor: '#DC2626',
   },
   presetBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#6B7280',
   },
   presetBtnTextActive: {
     color: '#FFF',
@@ -850,7 +889,6 @@ const styles = StyleSheet.create({
   },
   dateLabel: {
     fontSize: 13,
-    color: '#6B7280',
     marginBottom: 8,
     fontWeight: '600',
   },
@@ -859,35 +897,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 14,
-    backgroundColor: '#F9FAFB',
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: '#E5E7EB',
   },
   dateText: {
     fontSize: 14,
-    color: '#1F2937',
     fontWeight: '600',
   },
   dateArrow: {
     fontSize: 24,
-    color: '#EF4444',
     marginTop: 24,
     fontWeight: 'bold',
   },
   summarySection: {
-    backgroundColor: '#FEF2F2',
     borderRadius: 20,
     padding: 20,
     marginHorizontal: 16,
     marginBottom: 20,
     borderWidth: 2,
-    borderColor: '#FEE2E2',
   },
   summaryTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#DC2626',
     marginBottom: 16,
   },
   summaryRow: {
@@ -895,24 +926,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#FEE2E2',
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#6B7280',
     fontWeight: '500',
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#1F2937',
   },
   saveButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: '#EF4444',
     paddingVertical: 18,
     borderRadius: 20,
     marginHorizontal: 16,
@@ -940,12 +967,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#FFF',
   },
 
   cancelButtonText: {
-    color: '#6B7280',
     fontSize: 17,
     fontWeight: '700',
   },
@@ -961,7 +985,6 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   webDatePickerContent: {
-    backgroundColor: '#fff',
     borderRadius: 24,
     padding: 24,
     width: '90%',

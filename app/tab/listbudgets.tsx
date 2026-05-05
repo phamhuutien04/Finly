@@ -4,17 +4,18 @@ import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Appearance,
+    FlatList,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 // Chỉ import DateTimePicker khi không phải web
 let DateTimePicker: any = null;
@@ -24,6 +25,21 @@ if (Platform.OS !== "web") {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
+}
 
 type Category = {
   id: number;
@@ -43,6 +59,20 @@ type Budget = {
 export default function BudgetListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
+  
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#ffffff';
+  const cardBg = isDark ? '#1f2937' : '#f8f9fa';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#777777';
+  const borderColor = isDark ? '#374151' : '#eeeeee';
+  const inputBg = isDark ? '#1f2937' : '#fafafa';
+  const modalBg = isDark ? '#1f2937' : '#ffffff';
+  const accentColor = '#3b82f6';
+  const dangerColor = '#ef4444';
   
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -279,28 +309,28 @@ export default function BudgetListScreen() {
       : item.category?.name || 'Không có hạng mục';
 
     return (
-      <ThemedView style={styles.card}>
+      <ThemedView style={[styles.card, { backgroundColor: cardBg, borderColor: borderColor }]}>
         <View style={styles.cardContent}>
-          <ThemedText style={styles.category}>
+          <ThemedText style={[styles.category, { color: text }]}>
             {categoryName}
           </ThemedText>
-          <ThemedText style={styles.amount}>
+          <ThemedText style={[styles.amount, { color: dangerColor }]}>
             Giới hạn: {new Intl.NumberFormat('vi-VN').format(item.amount)} ₫
           </ThemedText>
-          <ThemedText style={styles.period}>
+          <ThemedText style={[styles.period, { color: subtleText }]}>
             Chu kỳ: {item.period === 'monthly' ? 'Theo Tháng' : item.period === 'weekly' ? 'Theo Tuần' : 'Tùy chỉnh'}
           </ThemedText>
-          <ThemedText style={styles.date}>
+          <ThemedText style={[styles.date, { color: subtleText }]}>
             Thời gian: {start} → {end}
           </ThemedText>
         </View>
 
         <View style={styles.actions}>
-          <Pressable style={styles.editButton} onPress={() => openEditModal(item)}>
+          <Pressable style={[styles.editButton, { backgroundColor: accentColor }]} onPress={() => openEditModal(item)}>
             <Text style={styles.buttonText}>Sửa</Text>
           </Pressable>
           <TouchableOpacity
-            style={styles.deleteButton}
+            style={[styles.deleteButton, { backgroundColor: dangerColor }]}
             onPress={() => confirmDelete(item.id)}
           >
             <Text style={styles.buttonText}>Xóa</Text>
@@ -311,12 +341,12 @@ export default function BudgetListScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">Danh sách Ngân sách</ThemedText>
-      <ThemedText style={styles.subtitle}>Quản lý ngân sách chi tiêu</ThemedText>
+    <ThemedView style={[styles.container, { backgroundColor: screenBg }]}>
+      <ThemedText type="title" style={{ color: text }}>Danh sách Ngân sách</ThemedText>
+      <ThemedText style={[styles.subtitle, { color: subtleText }]}>Quản lý ngân sách chi tiêu</ThemedText>
 
       <Pressable
-        style={styles.addNewButton}
+        style={[styles.addNewButton, { backgroundColor: accentColor }]}
         onPress={() => router.push('/tab/explore')}
       >
         <Text style={styles.addNewText}>+ Tạo ngân sách mới</Text>
@@ -324,12 +354,12 @@ export default function BudgetListScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#3b82f6" />
-          <Text style={{ marginTop: 12, color: '#666' }}>Đang tải...</Text>
+          <ActivityIndicator size="large" color={accentColor} />
+          <Text style={{ marginTop: 12, color: subtleText }}>Đang tải...</Text>
         </View>
       ) : budgets.length === 0 ? (
         <View style={styles.center}>
-          <ThemedText style={{ fontSize: 18, opacity: 0.7, textAlign: 'center' }}>
+          <ThemedText style={{ fontSize: 18, opacity: 0.7, textAlign: 'center', color: text }}>
             Chưa có ngân sách nào
           </ThemedText>
         </View>
@@ -350,23 +380,25 @@ export default function BudgetListScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <ThemedView style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>Chỉnh sửa Ngân sách</ThemedText>
+          <ThemedView style={[styles.modalContent, { backgroundColor: modalBg }]}>
+            <ThemedText style={[styles.modalTitle, { color: text }]}>Chỉnh sửa Ngân sách</ThemedText>
 
             <ScrollView style={{ maxHeight: 500 }}>
-              <Text style={styles.modalLabel}>Hạng mục chi tiêu</Text>
+              <Text style={[styles.modalLabel, { color: text }]}>Hạng mục chi tiêu</Text>
               <View style={styles.modalGrid}>
                 {categories.map(cat => (
                   <TouchableOpacity
                     key={cat.id}
                     style={[
                       styles.modalItem,
-                      selectedCategoryId === cat.id && styles.modalItemSelected,
+                      { backgroundColor: inputBg, borderColor: borderColor },
+                      selectedCategoryId === cat.id && { backgroundColor: accentColor },
                     ]}
                     onPress={() => setSelectedCategoryId(cat.id)}
                   >
                     <Text style={[
                       styles.modalItemText,
+                      { color: text },
                       selectedCategoryId === cat.id && { color: '#fff' },
                     ]}>
                       {cat.name || 'Không tên'}
@@ -375,39 +407,46 @@ export default function BudgetListScreen() {
                 ))}
               </View>
 
-              <Text style={styles.modalLabel}>Giới hạn (VND)</Text>
+              <Text style={[styles.modalLabel, { color: text }]}>Giới hạn (VND)</Text>
               <TextInput
-                style={styles.modalInput}
+                style={[styles.modalInput, { borderColor: borderColor, backgroundColor: inputBg, color: text }]}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
                 placeholder="Ví dụ: 5000000"
+                placeholderTextColor={subtleText}
               />
 
-              <Text style={styles.modalLabel}>Chu kỳ</Text>
+              <Text style={[styles.modalLabel, { color: text }]}>Chu kỳ</Text>
               <View style={styles.modalRow}>
                 {(['monthly', 'weekly', 'custom'] as const).map(p => (
                   <TouchableOpacity
                     key={p}
                     style={[
                       styles.modalBtn,
-                      period === p && styles.modalBtnActive,
+                      { backgroundColor: inputBg },
+                      period === p && { backgroundColor: accentColor },
                     ]}
                     onPress={() => {
                       setPeriod(p);
                       updateDateRange();
                     }}
                   >
-                    <Text style={period === p ? { color: '#fff' } : { color: '#333' }}>
+                    <Text style={period === p ? { color: '#fff' } : { color: text }}>
                       {p === 'monthly' ? 'Tháng' : p === 'weekly' ? 'Tuần' : 'Tùy chỉnh'}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Text style={styles.modalLabel}>Từ ngày</Text>
-              <TouchableOpacity style={styles.modalDateBtn} onPress={() => setShowStartPicker(true)}>
-                <Text>{startDate.toLocaleDateString('vi-VN')}</Text>
+              <Text style={[styles.modalLabel, { color: text }]}>Từ ngày</Text>
+              <TouchableOpacity style={[styles.modalDateBtn, { borderColor: borderColor, backgroundColor: inputBg }]} onPress={() => setShowStartPicker(true)}>
+                <Text style={{ color: text }}>{startDate.toLocaleDateString('vi-VN')}</Text>
+              </TouchableOpacity>
+
+              <Text style={[styles.modalLabel, { color: text }]}>Đến ngày</Text>
+              <TouchableOpacity style={[styles.modalDateBtn, { borderColor: borderColor, backgroundColor: inputBg }]} onPress={() => setShowEndPicker(true)}>
+                <Text style={{ color: text }}>{endDate.toLocaleDateString('vi-VN')}</Text>
               </TouchableOpacity>
 
           {/* Date Pickers - chỉ hiển thị trên mobile */}
@@ -438,8 +477,8 @@ export default function BudgetListScreen() {
           {/* Web Date Pickers */}
           {Platform.OS === 'web' && showStartPicker && (
             <View style={styles.webDatePicker}>
-              <View style={styles.webDatePickerContent}>
-                <Text style={styles.modalLabel}>Chọn ngày bắt đầu</Text>
+              <View style={[styles.webDatePickerContent, { backgroundColor: modalBg }]}>
+                <Text style={[styles.modalLabel, { color: text }]}>Chọn ngày bắt đầu</Text>
                 <input
                   type="date"
                   value={startDate.toISOString().split('T')[0]}
@@ -452,14 +491,16 @@ export default function BudgetListScreen() {
                   style={{
                     padding: 12,
                     borderRadius: 8,
-                    border: '1px solid #ddd',
+                    border: `1px solid ${borderColor}`,
                     fontSize: 16,
                     width: '100%',
                     marginBottom: 12,
+                    backgroundColor: inputBg,
+                    color: text,
                   }}
                 />
                 <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: '#3b82f6' }]}
+                  style={[styles.modalBtn, { backgroundColor: accentColor }]}
                   onPress={() => setShowStartPicker(false)}
                 >
                   <Text style={{ color: '#fff' }}>Xong</Text>
@@ -470,8 +511,8 @@ export default function BudgetListScreen() {
 
           {Platform.OS === 'web' && showEndPicker && (
             <View style={styles.webDatePicker}>
-              <View style={styles.webDatePickerContent}>
-                <Text style={styles.modalLabel}>Chọn ngày kết thúc</Text>
+              <View style={[styles.webDatePickerContent, { backgroundColor: modalBg }]}>
+                <Text style={[styles.modalLabel, { color: text }]}>Chọn ngày kết thúc</Text>
                 <input
                   type="date"
                   value={endDate.toISOString().split('T')[0]}
@@ -484,14 +525,16 @@ export default function BudgetListScreen() {
                   style={{
                     padding: 12,
                     borderRadius: 8,
-                    border: '1px solid #ddd',
+                    border: `1px solid ${borderColor}`,
                     fontSize: 16,
                     width: '100%',
                     marginBottom: 12,
+                    backgroundColor: inputBg,
+                    color: text,
                   }}
                 />
                 <TouchableOpacity
-                  style={[styles.modalBtn, { backgroundColor: '#3b82f6' }]}
+                  style={[styles.modalBtn, { backgroundColor: accentColor }]}
                   onPress={() => setShowEndPicker(false)}
                 >
                   <Text style={{ color: '#fff' }}>Xong</Text>
@@ -503,14 +546,14 @@ export default function BudgetListScreen() {
 
             <View style={styles.modalActions}>
               <Pressable
-                style={styles.modalCancel}
+                style={[styles.modalCancel, { backgroundColor: isDark ? '#374151' : '#6b7280' }]}
                 onPress={() => setModalVisible(false)}
               >
                 <Text style={styles.modalBtnText}>Hủy</Text>
               </Pressable>
 
               <Pressable
-                style={styles.modalSave}
+                style={[styles.modalSave, { backgroundColor: accentColor }]}
                 onPress={handleSaveEdit}
                 disabled={saving}
               >
@@ -542,22 +585,22 @@ export default function BudgetListScreen() {
         onRequestClose={handleCancelDelete}
       >
         <View style={styles.confirmOverlay}>
-          <View style={styles.confirmBox}>
-            <Text style={styles.confirmTitle}>Xác nhận xóa</Text>
-            <Text style={styles.confirmMessage}>
+          <View style={[styles.confirmBox, { backgroundColor: modalBg }]}>
+            <Text style={[styles.confirmTitle, { color: text }]}>Xác nhận xóa</Text>
+            <Text style={[styles.confirmMessage, { color: subtleText }]}>
               Bạn có chắc muốn xóa ngân sách này? Không thể khôi phục.
             </Text>
             
             <View style={styles.confirmButtons}>
               <TouchableOpacity
-                style={styles.confirmCancelBtn}
+                style={[styles.confirmCancelBtn, { backgroundColor: isDark ? '#374151' : '#E5E7EB' }]}
                 onPress={handleCancelDelete}
               >
-                <Text style={styles.confirmCancelText}>Hủy</Text>
+                <Text style={[styles.confirmCancelText, { color: isDark ? '#f9fafb' : '#374151' }]}>Hủy</Text>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.confirmDeleteBtn}
+                style={[styles.confirmDeleteBtn, { backgroundColor: dangerColor }]}
                 onPress={handleConfirmDelete}
               >
                 <Text style={styles.confirmDeleteText}>Xóa</Text>
@@ -571,10 +614,9 @@ export default function BudgetListScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: '#fff' },
+  container: { flex: 1, padding: 16 },
   subtitle: { fontSize: 15, opacity: 0.7, marginBottom: 20 },
   addNewButton: {
-    backgroundColor: '#3b82f6',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
@@ -585,24 +627,20 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 12,
-    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#eee',
   },
   cardContent: { marginBottom: 12 },
   category: { fontSize: 17, fontWeight: '700', marginBottom: 6 },
-  amount: { fontSize: 15, fontWeight: '600', color: '#ef4444', marginBottom: 4 },
-  period: { fontSize: 14, color: '#555', marginBottom: 4 },
-  date: { fontSize: 14, color: '#777' },
+  amount: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  period: { fontSize: 14, marginBottom: 4 },
+  date: { fontSize: 14 },
   actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   editButton: {
-    backgroundColor: '#3b82f6',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
   },
   deleteButton: {
-    backgroundColor: '#ef4444',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
@@ -620,7 +658,6 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxHeight: '90%',
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     elevation: 10,
@@ -648,11 +685,10 @@ const styles = StyleSheet.create({
     minWidth: '45%',
     padding: 12,
     borderRadius: 10,
-    backgroundColor: '#f0f0f0',
     alignItems: 'center',
+    borderWidth: 1,
   },
   modalItemSelected: {
-    backgroundColor: '#3b82f6',
   },
   modalItemText: {
     fontSize: 14,
@@ -661,11 +697,9 @@ const styles = StyleSheet.create({
   },
   modalInput: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 10,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#fafafa',
   },
   modalRow: {
     flexDirection: 'row',
@@ -675,21 +709,17 @@ const styles = StyleSheet.create({
   modalBtn: {
     flex: 1,
     paddingVertical: 12,
-    backgroundColor: '#f0f0f0',
     borderRadius: 10,
     alignItems: 'center',
   },
   modalBtnActive: {
-    backgroundColor: '#3b82f6',
   },
   modalDateBtn: {
     borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 10,
     padding: 12,
     alignItems: 'center',
     marginBottom: 16,
-    backgroundColor: '#fafafa',
   },
   modalActions: {
     flexDirection: 'row',
@@ -699,14 +729,12 @@ const styles = StyleSheet.create({
   modalCancel: {
     flex: 1,
     paddingVertical: 14,
-    backgroundColor: '#6b7280',
     borderRadius: 10,
     alignItems: 'center',
   },
   modalSave: {
     flex: 1,
     paddingVertical: 14,
-    backgroundColor: '#3b82f6',
     borderRadius: 10,
     alignItems: 'center',
   },
@@ -729,7 +757,6 @@ const styles = StyleSheet.create({
     zIndex: 1000,
   },
   webDatePickerContent: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
     width: '90%',
@@ -745,7 +772,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   confirmBox: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
     width: '100%',
@@ -759,12 +785,10 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
     marginBottom: 12,
   },
   confirmMessage: {
     fontSize: 15,
-    color: '#6B7280',
     marginBottom: 24,
     lineHeight: 22,
   },
@@ -777,10 +801,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    backgroundColor: '#E5E7EB',
   },
   confirmCancelText: {
-    color: '#374151',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -789,7 +811,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
-    backgroundColor: '#EF4444',
   },
   confirmDeleteText: {
     color: '#fff',
