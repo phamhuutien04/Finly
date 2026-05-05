@@ -642,7 +642,7 @@ export default function CategoriesScreen() {
 
       <Modal visible={open} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <ThemedView style={styles.modalContent}>
+          <ThemedView style={[styles.modalContent, { backgroundColor: cardBg, borderColor: borderColor }]}>
             <ThemedText style={[styles.modalTitle, { color: text }]}>
               {editing ? "Sửa danh mục" : "Thêm danh mục"}
             </ThemedText>
@@ -654,11 +654,12 @@ export default function CategoriesScreen() {
                   onPress={() => setFormType("expense")}
                   style={[
                     styles.modalTypeBtn,
+                    { backgroundColor: cardBg, borderColor: borderColor },
                     formType === "expense" && styles.modalTypeBtnActiveExpense,
                     editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={[styles.modalTypeText, { color: text }]}>Chi tiêu</ThemedText>
+                  <ThemedText style={[styles.modalTypeText, { color: formType === "expense" ? "#ffffff" : text }]}>Chi tiêu</ThemedText>
                 </Pressable>
 
                 <Pressable
@@ -666,11 +667,12 @@ export default function CategoriesScreen() {
                   onPress={() => setFormType("income")}
                   style={[
                     styles.modalTypeBtn,
+                    { backgroundColor: cardBg, borderColor: borderColor },
                     formType === "income" && styles.modalTypeBtnActiveIncome,
                     editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={[styles.modalTypeText, { color: text }]}>Thu nhập</ThemedText>
+                  <ThemedText style={[styles.modalTypeText, { color: formType === "income" ? "#ffffff" : text }]}>Thu nhập</ThemedText>
                 </Pressable>
               </View>
             )}
@@ -699,11 +701,11 @@ export default function CategoriesScreen() {
               <View style={styles.iconHeader}>
                 <ThemedText style={[styles.iconLabel, { color: text }]}>Icon</ThemedText>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <Pressable onPress={pickFromLibrary} style={styles.iconBtn}>
+                  <Pressable onPress={pickFromLibrary} style={[styles.iconBtn, { backgroundColor: accentColor }]}>
                     <ThemedText style={styles.iconBtnText}>Chọn ảnh</ThemedText>
                   </Pressable>
-                  <Pressable onPress={clearIcon} style={styles.iconBtnGhost}>
-                    <ThemedText style={styles.iconBtnText}>Xóa</ThemedText>
+                  <Pressable onPress={clearIcon} style={[styles.iconBtnGhost, { borderColor: borderColor }]}>
+                    <ThemedText style={[styles.iconBtnText, { color: text }]}>Xóa</ThemedText>
                   </Pressable>
                 </View>
               </View>
@@ -737,13 +739,13 @@ export default function CategoriesScreen() {
             </View>
 
             <View style={styles.modalButtons}>
-                <Pressable
-                  onPress={() => setOpen(false)}
-                  style={styles.modalBtnCancel}
-                  disabled={saving}
-                >
-                  <ThemedText style={[styles.modalBtnCancelText, { color: text }]}>Hủy</ThemedText>
-                </Pressable>
+              <Pressable
+                onPress={() => setOpen(false)}
+                style={[styles.modalBtnCancel, { backgroundColor: cardBg, borderColor: borderColor }]}
+                disabled={saving}
+              >
+                <ThemedText style={[styles.modalBtnCancelText, { color: text }]}>Hủy</ThemedText>
+              </Pressable>
 
               <Pressable
                 onPress={onSave}
@@ -1066,6 +1068,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 12,
+    borderWidth: 1,
   },
   modalTitle: {
     fontSize: 24,
@@ -1082,18 +1085,16 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderWidth: 1,
     alignItems: "center",
   },
   modalTypeBtnActiveExpense: {
-    backgroundColor: "rgba(239,68,68,0.15)",
-    borderColor: "rgba(239,68,68,0.4)",
+    backgroundColor: "#ef4444",
+    borderColor: "#ef4444",
   },
   modalTypeBtnActiveIncome: {
-    backgroundColor: "rgba(16,185,129,0.15)",
-    borderColor: "rgba(16,185,129,0.4)",
+    backgroundColor: "#10b981",
+    borderColor: "#10b981",
   },
   modalTypeText: {
     fontSize: 14,
@@ -1122,24 +1123,22 @@ const styles = StyleSheet.create({
   iconLabel: {
     fontSize: 14,
     fontWeight: "600",
-    opacity: 0.8,
   },
   iconBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
-    backgroundColor: "rgba(59,130,246,0.15)",
   },
   iconBtnGhost: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.2)",
   },
   iconBtnText: {
     fontSize: 13,
     fontWeight: "600",
+    color: "#ffffff",
   },
   iconPreview: {
     alignSelf: "flex-start",
@@ -1188,15 +1187,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.15)",
     alignItems: "center",
   },
   modalBtnCancelText: {
     fontSize: 16,
     fontWeight: "600",
-    opacity: 0.9,
   },
   modalBtnSave: {
     flex: 1,
