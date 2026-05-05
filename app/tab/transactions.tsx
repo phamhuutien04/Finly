@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Appearance,
     FlatList,
     Image,
     Platform,
@@ -11,12 +12,27 @@ import {
     RefreshControl,
     StyleSheet,
     TextInput,
-    View,
+    View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { supabase } from "@/lib/supabase";
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
+}
 
 type TxType = "income" | "expense" | "all";
 
@@ -44,7 +60,7 @@ function formatDateLabel(date: Date | null) {
 }
 
 // Web DatePicker Component - Đơn giản
-const WebDatePicker = ({ value, onChange }: { value: Date; onChange: (date: Date) => void }) => {
+const WebDatePicker = ({ value, onChange, isDark }: { value: Date; onChange: (date: Date) => void; isDark: boolean }) => {
   const formatDateForInput = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -68,8 +84,9 @@ const WebDatePicker = ({ value, onChange }: { value: Date; onChange: (date: Date
       style={{
         padding: '12px',
         borderRadius: '12px',
-        border: '1px solid #e2e8f0',
-        backgroundColor: '#f1f5f9',
+        border: `1px solid ${isDark ? '#374151' : '#e2e8f0'}`,
+        backgroundColor: isDark ? '#1f2937' : '#f1f5f9',
+        color: isDark ? '#f9fafb' : '#1f2937',
         fontSize: '16px',
         width: '100%',
         marginTop: '8px',
@@ -80,6 +97,17 @@ const WebDatePicker = ({ value, onChange }: { value: Date; onChange: (date: Date
 
 export default function AllTransactionsScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#f5f5f5';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#64748b';
+  const borderColor = isDark ? '#374151' : '#e2e8f0';
+  const inputBg = isDark ? '#1f2937' : '#f1f5f9';
+  const accentColor = '#6366f1';
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -257,34 +285,35 @@ export default function AllTransactionsScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
+    <ThemedView style={[styles.screen, { backgroundColor: screenBg }]}>
       <Stack.Screen options={{ 
         title: "Tất cả giao dịch",
-        headerStyle: { backgroundColor: '#ffffff' },
-        headerTitleStyle: { fontWeight: '900', fontSize: 20 },
+        headerStyle: { backgroundColor: cardBg },
+        headerTitleStyle: { fontWeight: '900', fontSize: 20, color: text },
         headerShadowVisible: false,
       }} />
 
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { backgroundColor: inputBg, borderColor: borderColor, color: text }]}
           placeholder="Tìm theo ghi chú hoặc danh mục..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholderTextColor="#94a3b8"
+          placeholderTextColor={subtleText}
         />
 
         <View style={styles.quickFilterContainer}>
           <Pressable
             style={[
               styles.quickFilterButton,
-              selectedDate && styles.quickFilterButtonActive,
+              { backgroundColor: inputBg, borderColor: borderColor },
+              selectedDate && { backgroundColor: accentColor, borderColor: accentColor },
             ]}
             onPress={selectToday}
           >
             <ThemedText style={[
               styles.quickFilterText,
-              selectedDate && styles.quickFilterTextActive,
+              { color: selectedDate ? '#ffffff' : subtleText },
             ]}>
               Hôm nay
             </ThemedText>
@@ -297,14 +326,15 @@ export default function AllTransactionsScreen() {
               key={type}
               style={[
                 styles.typeButton,
-                filterType === type && styles.typeButtonActive,
+                { backgroundColor: inputBg },
+                filterType === type && { backgroundColor: accentColor },
               ]}
               onPress={() => setFilterType(type)}
             >
               <ThemedText
                 style={[
                   styles.typeButtonText,
-                  filterType === type && styles.typeButtonTextActive,
+                  { color: filterType === type ? '#ffffff' : subtleText },
                 ]}
               >
                 {type === "all" ? "Tất cả" : type === "income" ? "Thu" : "Chi"}
@@ -315,16 +345,17 @@ export default function AllTransactionsScreen() {
 
         {/* PHẦN CHỌN NGÀY ĐƠN GIẢN */}
         <View style={styles.dateFilter}>
-          <ThemedText style={styles.dateFilterTitle}>Lọc theo ngày:</ThemedText>
+          <ThemedText style={[styles.dateFilterTitle, { color: text }]}>Lọc theo ngày:</ThemedText>
           
           <Pressable 
             style={[
               styles.dateButton,
-              selectedDate && styles.dateButtonActive
+              { backgroundColor: inputBg, borderColor: borderColor },
+              selectedDate && { borderColor: accentColor, backgroundColor: isDark ? '#1e293b' : '#eef2ff' }
             ]} 
             onPress={() => setShowPicker(true)}
           >
-            <ThemedText style={styles.dateButtonText}>
+            <ThemedText style={[styles.dateButtonText, { color: text }]}>
               {selectedDate ? formatDateLabel(selectedDate) : "Chọn ngày"}
             </ThemedText>
           </Pressable>
@@ -342,6 +373,7 @@ export default function AllTransactionsScreen() {
         <WebDatePicker
           value={selectedDate || new Date()}
           onChange={onDateChangeWeb}
+          isDark={isDark}
         />
       )}
 
@@ -369,13 +401,13 @@ export default function AllTransactionsScreen() {
         ListEmptyComponent={
           loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#6366f1" />
-              <ThemedText style={styles.loadingText}>Đang tải giao dịch...</ThemedText>
+              <ActivityIndicator size="large" color={accentColor} />
+              <ThemedText style={[styles.loadingText, { color: subtleText }]}>Đang tải giao dịch...</ThemedText>
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <ThemedText style={styles.emptyTitle}>Không tìm thấy giao dịch</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Không tìm thấy giao dịch</ThemedText>
+              <ThemedText style={[styles.emptyDescription, { color: subtleText }]}>
                 {searchQuery || selectedDate || filterType !== "all"
                   ? "Thử thay đổi bộ lọc tìm kiếm"
                   : "Hãy thêm giao dịch đầu tiên của bạn"}
@@ -385,10 +417,10 @@ export default function AllTransactionsScreen() {
         }
         renderItem={({ item }) => (
           <Pressable 
-            style={styles.txCard}
+            style={[styles.txCard, { backgroundColor: cardBg, borderColor: borderColor }]}
             // onPress={() => router.push(`/transaction/${item.id}`)}
           >
-            <View style={styles.txIconWrapper}>
+            <View style={[styles.txIconWrapper, { backgroundColor: inputBg, borderColor: borderColor }]}>
               {item.iconUri ? (
                 <Image source={{ uri: item.iconUri }} style={styles.txIconImage} />
               ) : (
@@ -399,10 +431,10 @@ export default function AllTransactionsScreen() {
             </View>
 
             <View style={{ flex: 1 }}>
-              <ThemedText style={styles.txCardTitle} numberOfLines={1}>
+              <ThemedText style={[styles.txCardTitle, { color: text }]} numberOfLines={1}>
                 {item.title}
               </ThemedText>
-              <ThemedText style={styles.txCardMeta}>
+              <ThemedText style={[styles.txCardMeta, { color: subtleText }]}>
                 {item.category} • {item.time}
               </ThemedText>
             </View>
@@ -426,72 +458,18 @@ export default function AllTransactionsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "900",
-    color: "#0f172a",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#64748b",
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  summaryContainer: {
-    backgroundColor: "#f8fafc",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  summaryItem: {
-    alignItems: "center",
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  incomeColor: {
-    color: "#10b981",
-  },
-  expenseColor: {
-    color: "#ef4444",
   },
   filterContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
   },
   searchInput: {
-    backgroundColor: "#f1f5f9",
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
   },
   quickFilterContainer: {
     flexDirection: "row",
@@ -501,21 +479,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 20,
-    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  quickFilterButtonActive: {
-    backgroundColor: "#6366f1",
-    borderColor: "#6366f1",
   },
   quickFilterText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#64748b",
-  },
-  quickFilterTextActive: {
-    color: "#ffffff",
   },
   typeFilter: {
     flexDirection: "row",
@@ -527,19 +495,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: "#f1f5f9",
     alignItems: "center",
   },
-  typeButtonActive: {
-    backgroundColor: "#6366f1",
-  },
   typeButtonText: {
-    color: "#64748b",
     fontWeight: "600",
     fontSize: 14,
-  },
-  typeButtonTextActive: {
-    color: "#ffffff",
   },
   dateFilter: {
     gap: 12,
@@ -547,23 +507,15 @@ const styles = StyleSheet.create({
   dateFilterTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#0f172a",
     marginBottom: 4,
   },
   dateButton: {
-    backgroundColor: "#f1f5f9",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
   },
-  dateButtonActive: {
-    borderColor: "#6366f1",
-    backgroundColor: "#eef2ff",
-  },
   dateButtonText: {
-    color: "#0f172a",
     fontWeight: "600",
     fontSize: 16,
   },
@@ -587,7 +539,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    backgroundColor: "#ffffff",
     borderRadius: 20,
     padding: 16,
     shadowColor: "#000",
@@ -596,17 +547,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.03)",
   },
   txIconWrapper: {
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: "#f8fafc",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
   },
   txIconImage: {
     width: 32,
@@ -619,12 +567,10 @@ const styles = StyleSheet.create({
   txCardTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#0f172a",
     marginBottom: 4,
   },
   txCardMeta: {
     fontSize: 13,
-    color: "#94a3b8",
     fontWeight: "600",
   },
   txAmount: {
@@ -637,7 +583,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    color: "#64748b",
     fontSize: 14,
   },
   emptyState: {
@@ -648,13 +593,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "900",
-    color: "#0f172a",
     marginBottom: 8,
     textAlign: "center",
   },
   emptyDescription: {
     fontSize: 15,
-    color: "#94a3b8",
     textAlign: "center",
     marginBottom: 20,
   },

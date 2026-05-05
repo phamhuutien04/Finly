@@ -2,19 +2,35 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Dimensions,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Appearance,
+    Dimensions,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { supabase } from "@/lib/supabase";
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
+}
 
 const { width: screenWidth } = Dimensions.get("window");
 const isSmallScreen = screenWidth < 375;
@@ -39,6 +55,21 @@ type Conversation = {
 
 export default function MessagesScreen() {
   const router = useRouter();
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const headerBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#6b7280';
+  const borderColor = isDark ? '#374151' : '#f3f4f6';
+  const iconColor = isDark ? '#f9fafb' : '#000000';
+  const accentColor = '#6366f1';
+  const placeholderBg = isDark ? '#374151' : '#f3f4f6';
+  const emptyIconBg = isDark ? '#1f2937' : '#f9fafb';
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -235,15 +266,15 @@ export default function MessagesScreen() {
 
     return (
       <Pressable
-        style={styles.conversationCard}
+        style={[styles.conversationCard, { backgroundColor: cardBg, borderColor: borderColor }]}
         onPress={() => router.push(`/chat/${item.other_user?.user_id}` as any)}
       >
         <View style={styles.avatarContainer}>
           {item.other_user.avatar_url ? (
             <Image source={{ uri: item.other_user.avatar_url }} style={styles.avatar} />
           ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={24} color="#9ca3af" />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: placeholderBg }]}>
+              <Ionicons name="person" size={24} color={subtleText} />
             </View>
           )}
           {item.unread_count && item.unread_count > 0 && (
@@ -257,17 +288,18 @@ export default function MessagesScreen() {
 
         <View style={styles.conversationInfo}>
           <View style={styles.conversationHeader}>
-            <ThemedText style={styles.conversationName} numberOfLines={1}>
+            <ThemedText style={[styles.conversationName, { color: text }]} numberOfLines={1}>
               {displayName}
             </ThemedText>
-            <ThemedText style={styles.conversationTime}>
+            <ThemedText style={[styles.conversationTime, { color: subtleText }]}>
               {messageTime}
             </ThemedText>
           </View>
           <ThemedText 
             style={[
               styles.lastMessage,
-              (item.unread_count && item.unread_count > 0) ? styles.lastMessageUnread : null
+              { color: subtleText },
+              (item.unread_count && item.unread_count > 0) ? [styles.lastMessageUnread, { color: text }] : null
             ]} 
             numberOfLines={2}
           >
@@ -279,17 +311,17 @@ export default function MessagesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
       <Stack.Screen options={{ headerShown: false }} />
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: headerBg, borderBottomColor: borderColor }]}>
         <Pressable 
           style={styles.backButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#000" />
+          <Ionicons name="arrow-back" size={24} color={iconColor} />
         </Pressable>
-        <ThemedText style={styles.headerTitle}>Tin nhắn</ThemedText>
+        <ThemedText style={[styles.headerTitle, { color: text }]}>Tin nhắn</ThemedText>
         <Pressable 
           style={styles.profileButton}
           onPress={async () => {
@@ -299,14 +331,14 @@ export default function MessagesScreen() {
             }
           }}
         >
-          <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+          <Ionicons name="person-circle-outline" size={28} color={accentColor} />
         </Pressable>
       </View>
 
       {/* Conversations List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       ) : (
         <FlatList
@@ -315,15 +347,15 @@ export default function MessagesScreen() {
           renderItem={renderConversation}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={accentColor} />
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="chatbubbles-outline" size={64} color="#d1d5db" />
+              <View style={[styles.emptyIconContainer, { backgroundColor: emptyIconBg, borderColor: borderColor }]}>
+                <Ionicons name="chatbubbles-outline" size={64} color={subtleText} />
               </View>
-              <ThemedText style={styles.emptyTitle}>Chưa có tin nhắn</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Chưa có tin nhắn</ThemedText>
+              <ThemedText style={[styles.emptyDescription, { color: subtleText }]}>
                 Bắt đầu trò chuyện với bạn bè từ trang Bạn bè
               </ThemedText>
             </View>
@@ -337,7 +369,6 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
   },
 
   // Header
@@ -347,9 +378,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     paddingVertical: 16,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   backButton: {
     padding: 4,
@@ -382,7 +411,6 @@ const styles = StyleSheet.create({
   conversationCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     gap: 12,
@@ -392,7 +420,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#f3f4f6",
   },
   avatarContainer: {
     position: "relative",
@@ -405,7 +432,6 @@ const styles = StyleSheet.create({
     borderColor: "#fff",
   },
   avatarPlaceholder: {
-    backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -444,17 +470,14 @@ const styles = StyleSheet.create({
   },
   conversationTime: {
     fontSize: 12,
-    color: "#9ca3af",
     fontWeight: "600",
   },
   lastMessage: {
     fontSize: 14,
-    color: "#6b7280",
     lineHeight: 18,
   },
   lastMessageUnread: {
     fontWeight: "700",
-    color: "#374151",
   },
 
   // Empty State
@@ -467,12 +490,10 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
     height: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
     borderRadius: isSmallScreen ? 50 : isMediumScreen ? 55 : 60,
-    backgroundColor: "#f9fafb",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
     borderWidth: 3,
-    borderColor: "#f3f4f6",
   },
   emptyTitle: {
     fontSize: isSmallScreen ? 18 : isMediumScreen ? 20 : 22,
@@ -483,7 +504,6 @@ const styles = StyleSheet.create({
   },
   emptyDescription: {
     fontSize: isSmallScreen ? 14 : isMediumScreen ? 14 : 15,
-    color: "#9ca3af",
     textAlign: "center",
     lineHeight: 22,
   },

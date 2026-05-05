@@ -2,17 +2,18 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View
+    ActivityIndicator,
+    Alert,
+    Appearance,
+    Dimensions,
+    FlatList,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    StyleSheet,
+    TextInput,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -21,6 +22,21 @@ import { ThemedView } from "@/components/themed-view";
 import useRealtimeMessages from "@/hooks/useRealtimeMessages";
 import { showError, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
+}
 
 const { width: screenWidth } = Dimensions.get("window");
 const isSmallScreen = screenWidth < 375;
@@ -45,6 +61,21 @@ export default function ChatScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
   const flatListRef = useRef<FlatList>(null);
+  
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#6b7280';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const inputBg = isDark ? '#1f2937' : '#f9fafb';
+  const accentColor = '#6366f1';
+  const emptyIconBg = isDark ? '#1f2937' : '#f9fafb';
+  const messageBubbleFriend = isDark ? '#1f2937' : '#ffffff';
+  const messageTextFriend = isDark ? '#f9fafb' : '#111827';
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -758,21 +789,21 @@ export default function ChatScreen() {
       <View style={[styles.messageContainer, isMyMessage && styles.myMessageContainer]}>
         <View style={[
           styles.messageBubble, 
-          isMyMessage ? styles.myMessageBubble : styles.friendMessageBubble,
-          isMoneyRequest && !isMyMessage && styles.moneyRequestBubble, // Only apply white background for received requests
+          isMyMessage ? styles.myMessageBubble : [styles.friendMessageBubble, { backgroundColor: messageBubbleFriend }],
+          isMoneyRequest && !isMyMessage && [styles.moneyRequestBubble, { backgroundColor: cardBg }], // Use cardBg for received requests
           isProcessed && isMyMessage && isMoneyRequest && styles.myProcessedRequestBubble,
-          isProcessed && !isMyMessage && isMoneyRequest && styles.processedRequestBubble
+          isProcessed && !isMyMessage && isMoneyRequest && [styles.processedRequestBubble, { backgroundColor: cardBg }]
         ]}>
           {isMoneyRequest && (
             <View style={styles.moneyRequestHeader}>
               <Ionicons 
                 name={isProcessed ? "checkmark-circle" : "card-outline"} 
                 size={16} 
-                color={isMyMessage ? (isProcessed ? "#10b981" : "#fff") : "#000000"} 
+                color={isMyMessage ? (isProcessed ? "#10b981" : "#fff") : (isDark ? "#f9fafb" : "#000000")} 
               />
               <ThemedText style={[
                 styles.moneyRequestLabel, 
-                isMyMessage ? (isProcessed ? styles.myProcessedRequestLabel : styles.myMessageText) : styles.friendRequestLabel
+                isMyMessage ? (isProcessed ? styles.myProcessedRequestLabel : styles.myMessageText) : [styles.friendRequestLabel, { color: isDark ? '#f9fafb' : '#000000' }]
               ]}>
                 {isMyMessage 
                   ? (isProcessed ? "ĐÃ ĐƯỢC THANH TOÁN" : "ĐANG CHỜ THANH TOÁN") 
@@ -783,10 +814,11 @@ export default function ChatScreen() {
           )}
           <ThemedText style={[
             styles.messageText, 
+            { color: messageTextFriend },
             isMyMessage && !isMoneyRequest && styles.myMessageText, // White text for my normal messages
             isMyMessage && isMoneyRequest && !isProcessed && styles.myMessageText, // White text for my pending money requests
             isMyMessage && isMoneyRequest && isProcessed && styles.myProcessedMessageText, // Dark green for my processed requests
-            !isMyMessage && isMoneyRequest && styles.moneyRequestText, // Black text for received money requests
+            !isMyMessage && isMoneyRequest && [styles.moneyRequestText, { color: isDark ? '#f9fafb' : '#000000' }], // Dynamic text for received money requests
           ]}>
             {item.content.replace(/\s*\[CAT:\d+\]/, '')}
           </ThemedText>
@@ -802,8 +834,8 @@ export default function ChatScreen() {
           )}
           {isMoneyRequest && !isMyMessage && isProcessed && (
             <View style={styles.processedIndicator}>
-              <Ionicons name="checkmark-circle" size={16} color="#000000" />
-              <ThemedText style={styles.processedText}>
+              <Ionicons name="checkmark-circle" size={16} color={isDark ? "#f9fafb" : "#000000"} />
+              <ThemedText style={[styles.processedText, { color: isDark ? '#f9fafb' : '#000000' }]}>
                 Đã thanh toán
               </ThemedText>
             </View>
@@ -813,7 +845,7 @@ export default function ChatScreen() {
             isMyMessage && !isMoneyRequest && styles.myMessageTime, // White time for my normal messages
             isMyMessage && isMoneyRequest && !isProcessed && styles.myMessageTime, // White time for my pending requests
             isMyMessage && isMoneyRequest && isProcessed && { color: "#065f46", opacity: 0.7 }, // Dark green time for my processed requests
-            !isMyMessage && isMoneyRequest && { color: "#000000", opacity: 0.6 } // Black time for received money requests
+            !isMyMessage && isMoneyRequest && { color: isDark ? '#f9fafb' : '#000000', opacity: 0.6 } // Dynamic time for received money requests
           ]}>
             {messageTime}
           </ThemedText>
@@ -824,17 +856,17 @@ export default function ChatScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
         <Stack.Screen options={{ title: "Đang tải..." }} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
       <Stack.Screen 
         options={{ 
           title: friendProfile?.display_name || "Chat",
@@ -852,7 +884,7 @@ export default function ChatScreen() {
                 onPress={() => router.push(`/profile/${userId}` as any)}
                 style={styles.headerButton}
               >
-                <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+                <Ionicons name="person-circle-outline" size={28} color={accentColor} />
               </Pressable>
             </View>
           )
@@ -874,11 +906,11 @@ export default function ChatScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="chatbubbles-outline" size={64} color="#d1d5db" />
+              <View style={[styles.emptyIconContainer, { backgroundColor: emptyIconBg, borderColor: borderColor }]}>
+                <Ionicons name="chatbubbles-outline" size={64} color={subtleText} />
               </View>
-              <ThemedText style={styles.emptyTitle}>Bắt đầu cuộc trò chuyện</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Bắt đầu cuộc trò chuyện</ThemedText>
+              <ThemedText style={[styles.emptyDescription, { color: subtleText }]}>
                 Gửi tin nhắn đầu tiên cho {friendProfile?.display_name}
               </ThemedText>
             </View>
@@ -886,7 +918,7 @@ export default function ChatScreen() {
           ListFooterComponent={
             otherUserTyping ? (
               <View style={styles.typingIndicator}>
-                <View style={styles.typingBubble}>
+                <View style={[styles.typingBubble, { backgroundColor: messageBubbleFriend }]}>
                   <View style={styles.typingDots}>
                     <View style={[styles.typingDot, styles.typingDot1]} />
                     <View style={[styles.typingDot, styles.typingDot2]} />
@@ -899,7 +931,7 @@ export default function ChatScreen() {
         />
 
         {/* Message Input */}
-        <View style={styles.inputContainer}>
+        <View style={[styles.inputContainer, { backgroundColor: cardBg, borderTopColor: borderColor }]}>
           <View style={styles.inputWrapper}>
             <Pressable
               onPress={() => {
@@ -908,11 +940,12 @@ export default function ChatScreen() {
               }}
               style={styles.moneyButton}
             >
-              <Ionicons name="card-outline" size={20} color="#6366f1" />
+              <Ionicons name="card-outline" size={20} color={accentColor} />
             </Pressable>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { borderColor: borderColor, backgroundColor: inputBg, color: text }]}
               placeholder="Nhập tin nhắn..."
+              placeholderTextColor={subtleText}
               value={newMessage}
               onChangeText={(text) => {
                 setNewMessage(text);
@@ -951,20 +984,20 @@ export default function ChatScreen() {
               onPress={() => setShowMoneyRequestModal(false)}
             >
               <Pressable onPress={(e) => e.stopPropagation()}>
-                <ThemedView style={styles.modalContent}>
+                <ThemedView style={[styles.modalContent, { backgroundColor: cardBg }]}>
                   <View style={styles.modalHeader}>
-                    <ThemedText style={styles.modalTitle}>Yêu cầu thanh toán</ThemedText>
+                    <ThemedText style={[styles.modalTitle, { color: text }]}>Yêu cầu thanh toán</ThemedText>
                     <Pressable onPress={() => setShowMoneyRequestModal(false)}>
-                      <Ionicons name="close" size={24} color="#6b7280" />
+                      <Ionicons name="close" size={24} color={subtleText} />
                     </Pressable>
                   </View>
 
                   <View style={styles.modalBody}>
-                    <ThemedText style={styles.label}>Danh mục</ThemedText>
+                    <ThemedText style={[styles.label, { color: text }]}>Danh mục</ThemedText>
                     {loadingCategories ? (
                       <View style={styles.categoryLoadingContainer}>
-                        <ActivityIndicator size="small" color="#6366f1" />
-                        <ThemedText style={styles.categoryLoadingText}>Đang tải danh mục...</ThemedText>
+                        <ActivityIndicator size="small" color={accentColor} />
+                        <ThemedText style={[styles.categoryLoadingText, { color: subtleText }]}>Đang tải danh mục...</ThemedText>
                       </View>
                     ) : (
                       <View style={styles.categorySelector}>
@@ -973,6 +1006,7 @@ export default function ChatScreen() {
                             key={category.id}
                             style={[
                               styles.categoryItem,
+                              { borderColor: borderColor, backgroundColor: inputBg },
                               selectedCategory?.id === category.id && styles.categoryItemSelected
                             ]}
                             onPress={() => setSelectedCategory(category)}
@@ -980,6 +1014,7 @@ export default function ChatScreen() {
                             <ThemedText style={styles.categoryEmoji}>{category.emoji || "📝"}</ThemedText>
                             <ThemedText style={[
                               styles.categoryName,
+                              { color: text },
                               selectedCategory?.id === category.id && styles.categoryNameSelected
                             ]}>
                               {category.name}
@@ -989,20 +1024,22 @@ export default function ChatScreen() {
                       </View>
                     )}
 
-                    <ThemedText style={[styles.label, { marginTop: 16 }]}>Số tiền</ThemedText>
+                    <ThemedText style={[styles.label, { marginTop: 16, color: text }]}>Số tiền</ThemedText>
                     <TextInput
-                      style={styles.amountInput}
+                      style={[styles.amountInput, { color: text, borderBottomColor: accentColor }]}
                       placeholder="0"
+                      placeholderTextColor={subtleText}
                       value={requestAmount}
                       onChangeText={handleAmountChange}
                       keyboardType="numeric"
                     />
-                    <ThemedText style={styles.currencyLabel}>VND</ThemedText>
+                    <ThemedText style={[styles.currencyLabel, { color: subtleText }]}>VND</ThemedText>
 
-                    <ThemedText style={[styles.label, { marginTop: 16 }]}>Lý do (tùy chọn)</ThemedText>
+                    <ThemedText style={[styles.label, { marginTop: 16, color: text }]}>Lý do (tùy chọn)</ThemedText>
                     <TextInput
-                      style={styles.reasonInput}
+                      style={[styles.reasonInput, { borderColor: borderColor, color: text }]}
                       placeholder="Ví dụ: Tiền ăn trưa, tiền xăng..."
+                      placeholderTextColor={subtleText}
                       value={requestReason}
                       onChangeText={setRequestReason}
                       multiline
@@ -1013,15 +1050,16 @@ export default function ChatScreen() {
                   <View style={styles.modalActions}>
                     <Pressable
                       onPress={() => setShowMoneyRequestModal(false)}
-                      style={styles.cancelButton}
+                      style={[styles.cancelButton, { backgroundColor: inputBg }]}
                     >
-                      <ThemedText style={styles.cancelButtonText}>Hủy</ThemedText>
+                      <ThemedText style={[styles.cancelButtonText, { color: text }]}>Hủy</ThemedText>
                     </Pressable>
                     <Pressable
                       onPress={sendMoneyRequest}
                       disabled={!requestAmount.trim() || !selectedCategory || sendingRequest}
                       style={[
                         styles.sendRequestButton,
+                        { backgroundColor: accentColor },
                         (!requestAmount.trim() || !selectedCategory || sendingRequest) && styles.sendRequestButtonDisabled
                       ]}
                     >
@@ -1045,7 +1083,6 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
   },
   container: {
     flex: 1,
@@ -1107,7 +1144,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   friendMessageBubble: {
-    backgroundColor: "#fff",
     borderBottomLeftRadius: 4,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -1122,12 +1158,10 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
     lineHeight: 20,
-    color: "#111827",
   },
   moneyRequestText: {
     fontSize: 15,
     lineHeight: 20,
-    color: "#000000", // Always black for money request content
     fontWeight: "600",
   },
   myMessageText: {
@@ -1139,7 +1173,6 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     marginTop: 4,
-    color: "#000000", // Black for better visibility
     opacity: 0.7,
   },
   myMessageTime: {
@@ -1150,9 +1183,7 @@ const styles = StyleSheet.create({
   // Input
   inputContainer: {
     padding: 16,
-    backgroundColor: "#fff",
     borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
   },
   inputWrapper: {
     flexDirection: "row",
@@ -1172,13 +1203,11 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
     maxHeight: 100,
-    backgroundColor: "#f9fafb",
   },
   sendButton: {
     width: 40,
@@ -1196,11 +1225,9 @@ const styles = StyleSheet.create({
   moneyRequestBubble: {
     borderWidth: 2,
     borderColor: "#6366f1",
-    backgroundColor: "#ffffff", // White background for received requests
   },
   processedRequestBubble: {
     borderColor: "#10b981",
-    backgroundColor: "#ffffff", // White background for processed received requests
   },
   myProcessedRequestBubble: {
     borderColor: "#10b981",
@@ -1215,7 +1242,6 @@ const styles = StyleSheet.create({
   moneyRequestLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#000000", // Black text for better visibility
     textTransform: "uppercase",
   },
   myProcessedRequestLabel: {
@@ -1227,7 +1253,6 @@ const styles = StyleSheet.create({
   friendRequestLabel: {
     fontSize: 12,
     fontWeight: "700",
-    color: "#000000", // Black text for better visibility
     textTransform: "uppercase",
   },
   moneyRequestActions: {
@@ -1245,7 +1270,6 @@ const styles = StyleSheet.create({
   processedText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#000000", // Black text for better visibility
   },
   payButton: {
     flex: 1,
@@ -1326,19 +1350,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingVertical: 16,
     borderBottomWidth: 2,
-    borderBottomColor: "#6366f1",
     marginBottom: 8,
   },
   currencyLabel: {
     fontSize: 16,
     fontWeight: "600",
     textAlign: "center",
-    color: "#6b7280",
     marginBottom: 16,
   },
   reasonInput: {
     borderWidth: 1,
-    borderColor: "#e5e7eb",
     borderRadius: 12,
     padding: 12,
     fontSize: 15,
@@ -1353,18 +1374,15 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#f3f4f6",
     alignItems: "center",
   },
   cancelButtonText: {
     fontWeight: "700",
-    color: "#374151",
   },
   sendRequestButton: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#6366f1",
     alignItems: "center",
   },
   sendRequestButtonDisabled: {
@@ -1388,8 +1406,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#f9fafb",
     gap: 6,
   },
   categoryItemSelected: {
@@ -1402,7 +1418,6 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#374151",
   },
   categoryNameSelected: {
     color: "#6366f1",
@@ -1415,7 +1430,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryLoadingText: {  // Renamed to avoid duplicate
-    color: "#6b7280",
     fontSize: 14,
   },
 
@@ -1425,7 +1439,6 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   typingBubble: {
-    backgroundColor: "#fff",
     borderRadius: 20,
     borderBottomLeftRadius: 4,
     paddingHorizontal: 16,
@@ -1469,12 +1482,10 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#f9fafb",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
     borderWidth: 3,
-    borderColor: "#f3f4f6",
   },
   emptyTitle: {
     fontSize: 20,
@@ -1484,7 +1495,6 @@ const styles = StyleSheet.create({
   },
   emptyDescription: {
     fontSize: 14,
-    color: "#9ca3af",
     textAlign: "center",
     lineHeight: 20,
   },
