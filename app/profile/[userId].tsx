@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 
 const showError = (title: string, message: string) => Alert.alert(title, message);
@@ -57,6 +58,8 @@ type UserProfile = {
 export default function ProfileScreen() {
   const router = useRouter();
   const { userId } = useLocalSearchParams<{ userId: string }>();
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
   
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -498,8 +501,15 @@ export default function ProfileScreen() {
   const renderPost = ({ item }: { item: Post }) => {
     const sharedInfo = parseSharedPost(item.content);
     
+    // Theme colors
+    const cardBg = isDark ? '#1f2937' : '#ffffff';
+    const text = isDark ? '#f9fafb' : '#1f2937';
+    const subtleText = isDark ? '#9ca3af' : '#65676b';
+    const borderColor = isDark ? '#374151' : '#e4e6eb';
+    const sharedBg = isDark ? '#374151' : '#f0f2f5';
+    
     return (
-      <ThemedView style={styles.postCard}>
+      <View style={[styles.postCard, { backgroundColor: cardBg, borderBottomColor: isDark ? '#374151' : '#f0f2f5' }]}>
         <View style={styles.postHeader}>
           <View style={styles.postUserInfo}>
             <Image
@@ -507,52 +517,52 @@ export default function ProfileScreen() {
               style={styles.postAvatar}
             />
             <View>
-              <ThemedText style={styles.postUserName}>{profile?.display_name}</ThemedText>
+              <ThemedText style={[styles.postUserName, { color: text }]}>{profile?.display_name}</ThemedText>
               <View style={styles.postMetaRow}>
-                <ThemedText style={styles.postTime}>
+                <ThemedText style={[styles.postTime, { color: subtleText }]}>
                   {new Date(item.created_at).toLocaleDateString('vi-VN')}
                 </ThemedText>
-                <ThemedText style={styles.postTime}> · </ThemedText>
-                <ThemedText style={styles.postTime}>{getVisibilityText(item.visibility)}</ThemedText>
+                <ThemedText style={[styles.postTime, { color: subtleText }]}> · </ThemedText>
+                <ThemedText style={[styles.postTime, { color: subtleText }]}>{getVisibilityText(item.visibility)}</ThemedText>
               </View>
             </View>
           </View>
         </View>
 
-        <ThemedText style={styles.postContent}>
+        <ThemedText style={[styles.postContent, { color: text }]}>
           {sharedInfo.is_shared ? `Đã chia sẻ bài viết của ${sharedInfo.original_author}` : item.content}
         </ThemedText>
 
         {sharedInfo.is_shared && (
           <View style={styles.sharedPostContainer}>
             <View style={styles.sharedPostBorder} />
-            <View style={styles.sharedPostContent}>
-              <ThemedText style={styles.sharedPostText}>{sharedInfo.original_content}</ThemedText>
+            <View style={[styles.sharedPostContent, { backgroundColor: sharedBg }]}>
+              <ThemedText style={[styles.sharedPostText, { color: text }]}>{sharedInfo.original_content}</ThemedText>
             </View>
           </View>
         )}
 
         {(item.likes_count > 0 || item.comments_count > 0 || item.shares_count > 0) && (
-          <View style={styles.postStats}>
+          <View style={[styles.postStats, { borderTopColor: borderColor, borderBottomColor: borderColor }]}>
             <View style={styles.postStatLeft}>
               {item.likes_count > 0 && (
                 <>
                   <View style={styles.likeIcon}>
                     <Ionicons name="heart" size={12} color="#fff" />
                   </View>
-                  <ThemedText style={styles.postStat}>{item.likes_count}</ThemedText>
+                  <ThemedText style={[styles.postStat, { color: subtleText }]}>{item.likes_count}</ThemedText>
                 </>
               )}
             </View>
             <View style={styles.postStatRight}>
               {item.comments_count > 0 && (
-                <ThemedText style={styles.postStat}>{item.comments_count} bình luận</ThemedText>
+                <ThemedText style={[styles.postStat, { color: subtleText }]}>{item.comments_count} bình luận</ThemedText>
               )}
               {item.comments_count > 0 && item.shares_count > 0 && (
-                <ThemedText style={styles.postStatDot}> · </ThemedText>
+                <ThemedText style={[styles.postStatDot, { color: subtleText }]}> · </ThemedText>
               )}
               {item.shares_count > 0 && (
-                <ThemedText style={styles.postStat}>{item.shares_count} chia sẻ</ThemedText>
+                <ThemedText style={[styles.postStat, { color: subtleText }]}>{item.shares_count} chia sẻ</ThemedText>
               )}
             </View>
           </View>
@@ -563,30 +573,30 @@ export default function ProfileScreen() {
             <Ionicons 
               name={item.user_liked ? "heart" : "heart-outline"} 
               size={20} 
-              color={item.user_liked ? "#ef4444" : "#65676b"} 
+              color={item.user_liked ? "#ef4444" : subtleText} 
             />
-            <ThemedText style={[styles.postActionText, item.user_liked && styles.postActionTextLiked]}>
+            <ThemedText style={[styles.postActionText, { color: item.user_liked ? "#ef4444" : subtleText }]}>
               Thích
             </ThemedText>
           </Pressable>
 
           <Pressable style={styles.postAction} onPress={() => openCommentsModal(item)}>
-            <Ionicons name="chatbubble-outline" size={20} color="#65676b" />
-            <ThemedText style={styles.postActionText}>Bình luận</ThemedText>
+            <Ionicons name="chatbubble-outline" size={20} color={subtleText} />
+            <ThemedText style={[styles.postActionText, { color: subtleText }]}>Bình luận</ThemedText>
           </Pressable>
 
           <Pressable style={styles.postAction} onPress={() => sharePost(item)}>
-            <Ionicons name="share-outline" size={20} color="#65676b" />
-            <ThemedText style={styles.postActionText}>Chia sẻ</ThemedText>
+            <Ionicons name="share-outline" size={20} color={subtleText} />
+            <ThemedText style={[styles.postActionText, { color: subtleText }]}>Chia sẻ</ThemedText>
           </Pressable>
         </View>
-      </ThemedView>
+      </View>
     );
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: isDark ? '#111827' : '#fff' }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366f1" />
         </View>
@@ -594,8 +604,18 @@ export default function ProfileScreen() {
     );
   }
 
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#f5f5f5';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#65676b';
+  const borderColor = isDark ? '#374151' : '#e4e6eb';
+  const inputBg = isDark ? '#374151' : '#f0f2f5';
+  const modalBg = isDark ? '#1f2937' : '#ffffff';
+  const overlayBg = isDark ? 'rgba(0,0,0,0.8)' : 'rgba(0,0,0,0.6)';
+
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]} edges={['bottom']}>
       <Stack.Screen options={{ title: profile?.display_name || "Hồ sơ" }} />
 
       <FlatList
@@ -604,7 +624,7 @@ export default function ProfileScreen() {
         renderItem={renderPost}
         ListHeaderComponent={
           <>
-            <ThemedView style={styles.profileHeader}>
+            <View style={[styles.profileHeader, { backgroundColor: cardBg }]}>
               <Image
                 source={{ uri: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&h=400&fit=crop' }}
                 style={styles.coverPhoto}
@@ -616,8 +636,8 @@ export default function ProfileScreen() {
                     style={styles.avatar}
                   />
                 </View>
-                <ThemedText style={styles.displayName}>{profile?.display_name}</ThemedText>
-                {profile?.bio && <ThemedText style={styles.bio}>{profile.bio}</ThemedText>}
+                <ThemedText style={[styles.displayName, { color: text }]}>{profile?.display_name}</ThemedText>
+                {profile?.bio && <ThemedText style={[styles.bio, { color: subtleText }]}>{profile.bio}</ThemedText>}
                 
                 <View style={styles.profileActions}>
                   {isOwner ? (
@@ -649,23 +669,23 @@ export default function ProfileScreen() {
                   )}
                 </View>
               </View>
-            </ThemedView>
+            </View>
 
-            <ThemedView style={styles.tabsContainer}>
+            <View style={[styles.tabsContainer, { backgroundColor: cardBg, borderBottomColor: borderColor }]}>
               <View style={styles.tabs}>
                 <Pressable style={[styles.tab, activeTab === 'posts' && styles.tabActive]} onPress={() => setActiveTab('posts')}>
-                  <ThemedText style={[styles.tabText, activeTab === 'posts' && styles.tabTextActive]}>Bài viết</ThemedText>
+                  <ThemedText style={[styles.tabText, { color: activeTab === 'posts' ? '#1877f2' : subtleText }]}>Bài viết</ThemedText>
                 </Pressable>
                 <Pressable style={[styles.tab, activeTab === 'about' && styles.tabActive]} onPress={() => setActiveTab('about')}>
-                  <ThemedText style={[styles.tabText, activeTab === 'about' && styles.tabTextActive]}>Giới thiệu</ThemedText>
+                  <ThemedText style={[styles.tabText, { color: activeTab === 'about' ? '#1877f2' : subtleText }]}>Giới thiệu</ThemedText>
                 </Pressable>
               </View>
-            </ThemedView>
+            </View>
 
             {activeTab === 'about' && (
-              <ThemedView style={styles.aboutSection}>
+              <View style={[styles.aboutSection, { backgroundColor: cardBg, borderBottomColor: isDark ? '#374151' : '#f0f2f5' }]}>
                 <View style={styles.aboutHeader}>
-                  <ThemedText style={styles.aboutTitle}>Giới thiệu</ThemedText>
+                  <ThemedText style={[styles.aboutTitle, { color: text }]}>Giới thiệu</ThemedText>
                   {isOwner && (
                     <Pressable style={styles.editButton} onPress={() => setShowEditModal(true)}>
                       <Ionicons name="create-outline" size={20} color="#1877f2" />
@@ -675,49 +695,50 @@ export default function ProfileScreen() {
                 </View>
                 
                 {profile?.bio ? (
-                  <ThemedText style={styles.aboutBio}>{profile.bio}</ThemedText>
+                  <ThemedText style={[styles.aboutBio, { color: text }]}>{profile.bio}</ThemedText>
                 ) : (
-                  <ThemedText style={styles.aboutEmpty}>
+                  <ThemedText style={[styles.aboutEmpty, { color: subtleText }]}>
                     {isOwner ? "Thêm tiểu sử để giới thiệu bản thân" : "Chưa có thông tin giới thiệu"}
                   </ThemedText>
                 )}
 
                 <View style={styles.aboutInfo}>
                   <View style={styles.aboutInfoItem}>
-                    <Ionicons name="mail-outline" size={20} color="#65676b" />
-                    <ThemedText style={styles.aboutInfoText}>{profile?.email}</ThemedText>
+                    <Ionicons name="mail-outline" size={20} color={subtleText} />
+                    <ThemedText style={[styles.aboutInfoText, { color: text }]}>{profile?.email}</ThemedText>
                   </View>
                 </View>
-              </ThemedView>
+              </View>
             )}
           </>
         }
         ListEmptyComponent={
           activeTab === 'posts' ? (
-            <ThemedView style={styles.emptyState}>
+            <View style={[styles.emptyState, { backgroundColor: cardBg }]}>
               <Ionicons name="document-text-outline" size={64} color="#d1d5db" />
-              <ThemedText style={styles.emptyText}>Chưa có bài viết nào</ThemedText>
-            </ThemedView>
+              <ThemedText style={[styles.emptyText, { color: subtleText }]}>Chưa có bài viết nào</ThemedText>
+            </View>
           ) : null
         }
       />
 
       <Modal visible={showEditModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <ThemedView style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Chỉnh sửa giới thiệu</ThemedText>
+        <View style={[styles.modalOverlay, { backgroundColor: overlayBg }]}>
+          <View style={[styles.modalContent, { backgroundColor: modalBg }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+              <ThemedText style={[styles.modalTitle, { color: text }]}>Chỉnh sửa giới thiệu</ThemedText>
               <Pressable onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color="#6b7280" />
+                <Ionicons name="close" size={24} color={subtleText} />
               </Pressable>
             </View>
 
             <View style={styles.editForm}>
               <View style={styles.formGroup}>
-                <ThemedText style={styles.formLabel}>Tên hiển thị</ThemedText>
+                <ThemedText style={[styles.formLabel, { color: text }]}>Tên hiển thị</ThemedText>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, { borderColor, backgroundColor: inputBg, color: text }]}
                   placeholder="Nhập tên của bạn"
+                  placeholderTextColor={subtleText}
                   value={editDisplayName}
                   onChangeText={setEditDisplayName}
                   maxLength={50}
@@ -725,17 +746,18 @@ export default function ProfileScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <ThemedText style={styles.formLabel}>Tiểu sử</ThemedText>
+                <ThemedText style={[styles.formLabel, { color: text }]}>Tiểu sử</ThemedText>
                 <TextInput
-                  style={[styles.formInput, styles.formTextArea]}
+                  style={[styles.formInput, styles.formTextArea, { borderColor, backgroundColor: inputBg, color: text }]}
                   placeholder="Viết vài dòng về bản thân..."
+                  placeholderTextColor={subtleText}
                   value={editBio}
                   onChangeText={setEditBio}
                   multiline
                   maxLength={200}
                   textAlignVertical="top"
                 />
-                <ThemedText style={styles.charCount}>{editBio.length}/200</ThemedText>
+                <ThemedText style={[styles.charCount, { color: subtleText }]}>{editBio.length}/200</ThemedText>
               </View>
             </View>
 
@@ -750,7 +772,42 @@ export default function ProfileScreen() {
                 <ThemedText style={styles.saveButtonText}>Lưu thay đổi</ThemedText>
               )}
             </Pressable>
-          </ThemedView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showCreateModal} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: overlayBg }]}>
+          <View style={[styles.modalContent, { backgroundColor: modalBg }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: borderColor }]}>
+              <ThemedText style={[styles.modalTitle, { color: text }]}>Tạo bài viết</ThemedText>
+              <Pressable onPress={() => setShowCreateModal(false)}>
+                <Ionicons name="close" size={24} color={subtleText} />
+              </Pressable>
+            </View>
+
+            <TextInput
+              style={[styles.postInput, { color: text }]}
+              placeholder="Bạn đang nghĩ gì?"
+              placeholderTextColor={subtleText}
+              value={newPostContent}
+              onChangeText={setNewPostContent}
+              multiline
+              maxLength={1000}
+            />
+
+            <Pressable
+              style={[styles.createButton, (!newPostContent.trim() || creating) && styles.createButtonDisabled]}
+              onPress={createPost}
+              disabled={!newPostContent.trim() || creating}
+            >
+              {creating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <ThemedText style={styles.createButtonText}>Đăng</ThemedText>
+              )}
+            </Pressable>
+          </View>
         </View>
       </Modal>
 
@@ -762,7 +819,6 @@ export default function ProfileScreen() {
               <Pressable onPress={() => {
                 setShowCommentsModal(false);
                 setReplyingTo(null);
-                setNewComment("");
               }}>
                 <Ionicons name="close" size={24} color="#6b7280" />
               </Pressable>
@@ -898,7 +954,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fff",
   },
   loadingContainer: {
     flex: 1,
