@@ -82,6 +82,7 @@ export default function ProfileScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState("");
   const [editBio, setEditBio] = useState("");
+  const [editAvatarUrl, setEditAvatarUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'about' | 'photos'>('posts');
   
@@ -143,6 +144,7 @@ export default function ProfileScreen() {
       setProfile(profileData);
       setEditDisplayName(profileData.display_name || "");
       setEditBio(profileData.bio || "");
+      setEditAvatarUrl(profileData.avatar_url || "");
 
       await loadPosts(user.id);
     } catch (error: any) {
@@ -458,6 +460,7 @@ export default function ProfileScreen() {
         .update({
           display_name: editDisplayName.trim(),
           bio: editBio.trim() || null,
+          avatar_url: editAvatarUrl.trim() || null,
         })
         .eq("user_id", currentUserId);
 
@@ -733,6 +736,28 @@ export default function ProfileScreen() {
             </View>
 
             <View style={styles.editForm}>
+              <View style={styles.formGroup}>
+                <ThemedText style={[styles.formLabel, { color: text }]}>Avatar URL</ThemedText>
+                <TextInput
+                  style={[styles.formInput, { borderColor, backgroundColor: inputBg, color: text }]}
+                  placeholder="https://example.com/avatar.jpg"
+                  placeholderTextColor={subtleText}
+                  value={editAvatarUrl}
+                  onChangeText={setEditAvatarUrl}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                {editAvatarUrl.trim() && (
+                  <View style={{ marginTop: 8, alignItems: 'center' }}>
+                    <Image
+                      source={{ uri: editAvatarUrl.trim() }}
+                      style={{ width: 80, height: 80, borderRadius: 40 }}
+                      onError={() => showError("Lỗi", "Không thể tải ảnh từ URL này")}
+                    />
+                  </View>
+                )}
+              </View>
+
               <View style={styles.formGroup}>
                 <ThemedText style={[styles.formLabel, { color: text }]}>Tên hiển thị</ThemedText>
                 <TextInput

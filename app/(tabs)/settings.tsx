@@ -1,4 +1,5 @@
 import { saveToDownloads } from '@/lib/DownloadModule';
+import { selectImageFromWeb, uploadImageToCloudinary } from '@/lib/cloudinaryService';
 import { syncSepayTransactions } from '@/lib/sepayService';
 import { File, Paths } from 'expo-file-system';
 import { Image } from 'expo-image';
@@ -315,77 +316,68 @@ export default function SettingsScreen() {
     setShowEditProfileModal(true);
   };
 
-  // Pick and upload avatar
+  // Pick and upload avatar to Cloudinary
   const pickAvatar = async () => {
     try {
-      // Request permission
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        showError('Lỗi', 'Cần quyền truy cập thư viện ảnh');
-        return;
+      let imageUri: string | null = null;
+
+      if (Platform.OS === 'web') {
+        // Web: use file input
+        imageUri = await selectImageFromWeb();
+      } else {
+        // Mobile: use ImagePicker
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          showError('Lỗi', 'Cần quyền truy cập thư viện ảnh');
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.8,
+        });
+
+        if (result.canceled) return;
+        imageUri = result.assets[0].uri;
       }
 
-      // Pick image
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (result.canceled) return;
+      if (!imageUri) return;
 
       setUploadingAvatar(true);
 
-      // Get file info
-      const uri = result.assets[0].uri;
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${currentUser?.id}.${fileExt}`; // Đơn giản hóa tên file
+      // Upload to Cloudinary
+      const uploadResult = await uploadImageToCloudinary(imageUri);
 
-      // Convert to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
-
-      // Upload to Supabase Storage với upsert
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, blob, {
-          contentType: `image/${fileExt}`,
-          upsert: true, // Ghi đè nếu đã tồn tại
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        showError('Lỗi', 'Không thể tải ảnh lên: ' + uploadError.message);
+      if (!uploadResult.success) {
+        showError('Lỗi', uploadResult.error || 'Không thể tải ảnh lên');
         return;
       }
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
+      const avatarUrl = uploadResult.url!;
 
-      const avatarUrl = urlData.publicUrl + '?t=' + Date.now(); // Cache busting
+      // Update user_profiles table
+      const { error: updateProfileError } = await supabase
+        .from('user_profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', currentUser?.id);
 
-      // Update user metadata
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          avatar_url: avatarUrl,
-        },
+      if (updateProfileError) {
+        console.error('Update profile error:', updateProfileError);
+        showError('Lỗi', 'Không thể cập nhật ảnh đại diện');
+        return;
+      }
+
+      // Update user metadata (optional, for backward compatibility)
+      await supabase.auth.updateUser({
+        data: { avatar_url: avatarUrl },
       });
-
-      if (updateError) {
-        console.error('Update error:', updateError);
-        showError('Lỗi', 'Không thể cập nhật ảnh đại diện: ' + updateError.message);
-        return;
-      }
 
       // Update local state
       if (currentUser) {
         setCurrentUser({ ...currentUser, avatar_url: avatarUrl });
       }
-
-      showSuccess('Thành công', 'Đã cập nhật ảnh đại diện');
     } catch (error: any) {
       console.error('Error picking avatar:', error);
       showError('Lỗi', error.message);

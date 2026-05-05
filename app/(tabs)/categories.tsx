@@ -8,17 +8,19 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   TextInput,
-  View,
+  View
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Colors } from "@/constants/theme";
 import { useAppColorScheme } from "@/contexts/ThemeContext";
+import { uploadImageToCloudinary } from "@/lib/cloudinaryService";
 import { supabase } from "@/lib/supabase";
 
 const { width } = Dimensions.get("window");
@@ -83,6 +85,7 @@ export default function CategoriesScreen() {
   const [iconUri, setIconUri] = useState<string>("");
   const [uploadedIconUrl, setUploadedIconUrl] = useState<string>("");
   const [iconPresetId, setIconPresetId] = useState<string>("");
+  const [uploadingIcon, setUploadingIcon] = useState(false);
 
   const router = useRouter();
 
@@ -317,44 +320,66 @@ export default function CategoriesScreen() {
   };
 
   const pickFromLibrary = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Thiếu quyền", "Bạn cần cho phép truy cập thư viện ảnh.");
-      return;
-    }
-
-    const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [1, 1],
-    });
-
-    if (!res.canceled && res.assets?.[0]?.uri) {
-      setIconUri(res.assets[0].uri);
-      setUploadedIconUrl("");
-      setIconPresetId("");
-    }
-  };
-
-  const uploadImageToStorage = async (localUri: string): Promise<string | null> => {
+    console.log('🖼️ pickFromLibrary called');
     try {
-      const response = await fetch(localUri);
-      const blob = await response.blob();
-      const fileName = `category-${Date.now()}.jpg`;
-      const filePath = `icons/${fileName}`;
+      setUploadingIcon(true);
+      console.log('📱 Platform:', Platform.OS);
+      
+      // Request permissions for mobile
+      if (Platform.OS !== 'web') {
+        console.log('📱 Requesting permissions...');
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        console.log('📱 Permission result:', perm);
+        if (!perm.granted) {
+          Alert.alert("Thiếu quyền", "Bạn cần cho phép truy cập thư viện ảnh.");
+          setUploadingIcon(false);
+          return;
+        }
+      }
 
-      const { error } = await supabase.storage
-        .from("category-icons")
-        .upload(filePath, blob, { contentType: "image/jpeg", upsert: true });
+      console.log('📸 Launching image picker...');
+      // Use ImagePicker for all platforms (works on web too)
+      const res = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
 
-      if (error) throw error;
+      console.log('📸 Image picker result:', res);
 
-      const { data } = supabase.storage.from("category-icons").getPublicUrl(filePath);
-      return data.publicUrl;
-    } catch (e: any) {
-      Alert.alert("Lỗi upload", e.message || "Kiểm tra bucket 'category-icons'");
-      return null;
+      if (res.canceled || !res.assets?.[0]?.uri) {
+        console.log('❌ Image picker canceled or no uri');
+        setUploadingIcon(false);
+        return;
+      }
+
+      const imageUri = res.assets[0].uri;
+      console.log('✅ Image URI:', imageUri);
+
+      // Upload to Cloudinary
+      console.log('☁️ Uploading to Cloudinary...');
+      const uploadResult = await uploadImageToCloudinary(imageUri);
+      console.log('☁️ Upload result:', uploadResult);
+
+      if (!uploadResult.success) {
+        console.error('❌ Upload failed:', uploadResult.error);
+        Alert.alert('Lỗi', uploadResult.error || 'Không thể tải ảnh lên');
+        setUploadingIcon(false);
+        return;
+      }
+
+      console.log('✅ Upload success, URL:', uploadResult.url);
+      // Set the uploaded URL
+      setIconUri(uploadResult.url!);
+      setUploadedIconUrl(uploadResult.url!);
+      setIconPresetId("");
+    } catch (error: any) {
+      console.error('❌ Error picking image:', error);
+      Alert.alert('Lỗi', error.message || 'Không thể chọn ảnh');
+    } finally {
+      console.log('🏁 pickFromLibrary finished');
+      setUploadingIcon(false);
     }
   };
 
@@ -381,16 +406,7 @@ export default function CategoriesScreen() {
     }
 
     const uid = await getUserId();
-    let finalIconUri = uploadedIconUrl || iconUri;
-
-    if (iconUri && (iconUri.startsWith("file://") || iconUri.startsWith("blob:"))) {
-      const uploadedUrl = await uploadImageToStorage(iconUri);
-      if (uploadedUrl) {
-        finalIconUri = uploadedUrl;
-      } else {
-        return;
-      }
-    }
+    const finalIconUri = uploadedIconUrl || iconUri;
 
     const payload: any = {
       name: n,
@@ -701,8 +717,16 @@ export default function CategoriesScreen() {
               <View style={styles.iconHeader}>
                 <ThemedText style={[styles.iconLabel, { color: text }]}>Icon</ThemedText>
                 <View style={{ flexDirection: "row", gap: 8 }}>
-                  <Pressable onPress={pickFromLibrary} style={[styles.iconBtn, { backgroundColor: accentColor }]}>
-                    <ThemedText style={styles.iconBtnText}>Chọn ảnh</ThemedText>
+                  <Pressable 
+                    onPress={pickFromLibrary} 
+                    style={[styles.iconBtn, { backgroundColor: accentColor, opacity: uploadingIcon ? 0.6 : 1 }]}
+                    disabled={uploadingIcon}
+                  >
+                    {uploadingIcon ? (
+                      <ActivityIndicator size="small" color="#ffffff" />
+                    ) : (
+                      <ThemedText style={styles.iconBtnText}>Chọn ảnh</ThemedText>
+                    )}
                   </Pressable>
                   <Pressable onPress={clearIcon} style={[styles.iconBtnGhost, { borderColor: borderColor }]}>
                     <ThemedText style={[styles.iconBtnText, { color: text }]}>Xóa</ThemedText>
