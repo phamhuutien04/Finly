@@ -2,19 +2,20 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -39,6 +40,24 @@ type Notification = {
 
 export default function NotificationsScreen() {
   const router = useRouter();
+  
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const cardBgUnread = isDark ? '#1e3a5f' : '#eef2ff';
+  const text = isDark ? '#f9fafb' : '#111827';
+  const subtleText = isDark ? '#9ca3af' : '#6b7280';
+  const borderColor = isDark ? '#374151' : '#f3f4f6';
+  const borderColorUnread = isDark ? '#1e40af' : '#c7d2fe';
+  const iconBg = isDark ? '#374151' : '#eef2ff';
+  const accentColor = '#6366f1';
+  const successColor = '#22c55e';
+  const emptyIconBg = isDark ? '#1f2937' : '#f9fafb';
+  const emptyBorderColor = isDark ? '#374151' : '#f3f4f6';
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -338,8 +357,9 @@ export default function NotificationsScreen() {
       <View style={styles.notificationWrapper}>
         <Pressable
           style={[
-            styles.notificationCard, 
-            !item.is_read && styles.notificationCardUnread
+            styles.notificationCard,
+            { backgroundColor: cardBg, borderColor: borderColor },
+            !item.is_read && { backgroundColor: cardBgUnread, borderColor: borderColorUnread }
           ]}
           onPress={() => {
             // Handle different notification types
@@ -370,24 +390,24 @@ export default function NotificationsScreen() {
                 style={styles.userAvatar}
               />
             ) : (
-              <View style={styles.iconContainer}>
+              <View style={[styles.iconContainer, { backgroundColor: iconBg }]}>
                 <Ionicons
                   name={getNotificationIcon(item.type)}
                   size={24}
-                  color="#6366f1"
+                  color={accentColor}
                 />
               </View>
             )}
           </View>
 
           <View style={styles.notificationContent}>
-            <ThemedText style={styles.notificationTitle}>
+            <ThemedText style={[styles.notificationTitle, { color: text }]}>
               {item.title}
             </ThemedText>
-            <ThemedText style={styles.notificationMessage}>
+            <ThemedText style={[styles.notificationMessage, { color: subtleText }]}>
               {item.message}
             </ThemedText>
-            <ThemedText style={styles.notificationTime}>
+            <ThemedText style={[styles.notificationTime, { color: subtleText }]}>
               {formatTime(item.created_at)}
             </ThemedText>
 
@@ -397,7 +417,8 @@ export default function NotificationsScreen() {
                 <Pressable
                   style={[
                     styles.inlineAcceptButton,
-                    item.action_taken === "accepted" && styles.buttonAccepted
+                    { backgroundColor: successColor },
+                    item.action_taken === "accepted" && { backgroundColor: isDark ? '#065f46' : '#d1fae5', borderColor: isDark ? '#047857' : '#a7f3d0' }
                   ]}
                   onPress={(e) => {
                     e.stopPropagation(); // Prevent navigation to profile
@@ -410,11 +431,11 @@ export default function NotificationsScreen() {
                   <Ionicons 
                     name={item.action_taken === "accepted" ? "checkmark-circle" : "checkmark"} 
                     size={16} 
-                    color={item.action_taken ? "#9ca3af" : "#fff"} 
+                    color={item.action_taken ? subtleText : "#fff"} 
                   />
                   <ThemedText style={[
                     styles.inlineButtonText, 
-                    { color: item.action_taken ? "#9ca3af" : "#fff" }
+                    { color: item.action_taken ? subtleText : "#fff" }
                   ]}>
                     {item.action_taken === "accepted" ? "Đã chấp nhận" : "Chấp nhận"}
                   </ThemedText>
@@ -422,7 +443,8 @@ export default function NotificationsScreen() {
                 <Pressable
                   style={[
                     styles.inlineRejectButton,
-                    item.action_taken === "rejected" && styles.buttonRejected
+                    { backgroundColor: isDark ? '#374151' : '#f3f4f6', borderColor: isDark ? '#4b5563' : '#e5e7eb' },
+                    item.action_taken === "rejected" && { backgroundColor: isDark ? '#7f1d1d' : '#fee2e2', borderColor: isDark ? '#991b1b' : '#fecaca' }
                   ]}
                   onPress={(e) => {
                     e.stopPropagation(); // Prevent navigation to profile
@@ -435,11 +457,11 @@ export default function NotificationsScreen() {
                   <Ionicons 
                     name={item.action_taken === "rejected" ? "close-circle" : "close"} 
                     size={16} 
-                    color={item.action_taken ? "#9ca3af" : "#6b7280"} 
+                    color={item.action_taken ? subtleText : subtleText} 
                   />
                   <ThemedText style={[
                     styles.inlineButtonText, 
-                    { color: item.action_taken ? "#9ca3af" : "#6b7280" }
+                    { color: subtleText }
                   ]}>
                     {item.action_taken === "rejected" ? "Đã từ chối" : "Từ chối"}
                   </ThemedText>
@@ -448,19 +470,19 @@ export default function NotificationsScreen() {
             )}
           </View>
 
-          {!item.is_read && <View style={styles.unreadDot} />}
+          {!item.is_read && <View style={[styles.unreadDot, { backgroundColor: accentColor }]} />}
         </Pressable>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
       <Stack.Screen options={{ title: "Thông báo" }} />
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       ) : (
         <FlatList
@@ -473,11 +495,11 @@ export default function NotificationsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
-                <Ionicons name="notifications-outline" size={64} color="#d1d5db" />
+              <View style={[styles.emptyIconContainer, { backgroundColor: emptyIconBg, borderColor: emptyBorderColor }]}>
+                <Ionicons name="notifications-outline" size={64} color={borderColor} />
               </View>
-              <ThemedText style={styles.emptyTitle}>Chưa có thông báo</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Chưa có thông báo</ThemedText>
+              <ThemedText style={[styles.emptyDescription, { color: subtleText }]}>
                 Bạn sẽ nhận được thông báo khi có người tag bạn trong giao dịch
               </ThemedText>
             </View>
@@ -491,7 +513,6 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
   },
   loadingContainer: {
     flex: 1,
@@ -512,7 +533,6 @@ const styles = StyleSheet.create({
   notificationCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 16,
     gap: 12,
@@ -522,16 +542,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#f3f4f6",
-  },
-  notificationCardUnread: {
-    backgroundColor: "#eef2ff",
-    borderColor: "#c7d2fe",
-  },
-  notificationCardRead: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-    opacity: 0.7,
   },
   notificationIcon: {
     width: 48,
@@ -544,19 +554,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "#fff",
   },
-  avatarMuted: {
-    opacity: 0.6,
-  },
   iconContainer: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#eef2ff",
     alignItems: "center",
     justifyContent: "center",
-  },
-  iconContainerMuted: {
-    backgroundColor: "#f3f4f6",
   },
   notificationContent: {
     flex: 1,
@@ -565,122 +568,53 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginBottom: 4,
-    color: "#111827",
   },
   notificationMessage: {
     fontSize: 14,
-    color: "#6b7280",
     lineHeight: 20,
     marginBottom: 6,
   },
-  textMuted: {
-    color: "#9ca3af",
-  },
   notificationTime: {
     fontSize: 12,
-    color: "#9ca3af",
     fontWeight: "600",
   },
   unreadDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#6366f1",
     marginTop: 4,
   },
 
   // Action Buttons
-  actionButtons: {
-    flexDirection: "row",
-    gap: 8,
-  },
   inlineActionButtons: {
     flexDirection: "row",
     gap: 8,
     marginTop: 12,
-  },
-  acceptButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#22c55e",
-    borderRadius: 12,
-    paddingVertical: 12,
-    gap: 6,
   },
   inlineAcceptButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#22c55e",
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     gap: 4,
   },
-  acceptButtonText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
   inlineButtonText: {
-    color: "#fff",
     fontSize: 13,
     fontWeight: "600",
-  },
-  rejectButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    paddingVertical: 12,
-    gap: 6,
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
   inlineRejectButton: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#f3f4f6",
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
     gap: 4,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  rejectButtonText: {
-    color: "#6b7280",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-    backgroundColor: "#f9fafb",
-  },
-  buttonMuted: {
-    opacity: 0.6,
-    backgroundColor: "#f3f4f6",
-  },
-  buttonAccepted: {
-    backgroundColor: "#d1fae5",
-    borderColor: "#a7f3d0",
-  },
-  buttonRejected: {
-    backgroundColor: "#fee2e2",
-    borderColor: "#fecaca",
-  },
-  buttonTextDisabled: {
-    color: "#9ca3af",
-  },
-  buttonTextMuted: {
-    color: "#9ca3af",
   },
 
   // Empty State
@@ -693,12 +627,10 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 100 : 120,
     height: isSmallScreen ? 100 : 120,
     borderRadius: isSmallScreen ? 50 : 60,
-    backgroundColor: "#f9fafb",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
     borderWidth: 3,
-    borderColor: "#f3f4f6",
   },
   emptyTitle: {
     fontSize: isSmallScreen ? 18 : 20,
@@ -708,7 +640,6 @@ const styles = StyleSheet.create({
   },
   emptyDescription: {
     fontSize: 14,
-    color: "#9ca3af",
     textAlign: "center",
     lineHeight: 22,
   },

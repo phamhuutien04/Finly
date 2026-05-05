@@ -3,7 +3,6 @@ import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
-    Appearance,
     FlatList,
     Image,
     KeyboardAvoidingView,
@@ -18,23 +17,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { showError, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
-
-// Simple hook to get color scheme that works on all platforms
-function useColorScheme() {
-  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
-  
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setColorScheme(colorScheme);
-    });
-    
-    return () => subscription.remove();
-  }, []);
-  
-  return colorScheme;
-}
 
 // Import notification functions conditionally
 let requestNotificationPermissions: any = null;
@@ -90,7 +75,7 @@ const normalizeTxType = (t: any): TxType => (t === "income" ? "income" : "expens
 export default function ModalAddTransactionNoAccount() {
   const router = useRouter();
   
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
   
   // Theme colors

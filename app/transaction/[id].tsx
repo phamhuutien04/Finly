@@ -2,13 +2,13 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Stack, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  Image,
-  ScrollView,
-  StyleSheet,
-  View
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    Image,
+    ScrollView,
+    StyleSheet,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -48,6 +48,22 @@ type Transaction = {
 
 export default function TransactionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  
+  const colorScheme = useAppColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#fafafa';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#111827';
+  const subtleText = isDark ? '#9ca3af' : '#6b7280';
+  const labelText = isDark ? '#9ca3af' : '#6b7280';
+  const iconBg = isDark ? '#374151' : '#eef2ff';
+  const borderColor = isDark ? '#374151' : '#f3f4f6';
+  const accentColor = '#6366f1';
+  const incomeColor = '#22c55e';
+  const expenseColor = '#ef4444';
+  
   const [loading, setLoading] = useState(true);
   const [transaction, setTransaction] = useState<Transaction | null>(null);
 
@@ -135,10 +151,10 @@ export default function TransactionDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
         <Stack.Screen options={{ title: "Đang tải..." }} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       </SafeAreaView>
     );
@@ -146,63 +162,63 @@ export default function TransactionDetailScreen() {
 
   if (!transaction) {
     return (
-      <SafeAreaView style={styles.screen}>
+      <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
         <Stack.Screen options={{ title: "Không tìm thấy" }} />
         <View style={styles.errorContainer}>
-          <Ionicons name="receipt-outline" size={64} color="#d1d5db" />
-          <ThemedText style={styles.errorText}>Không tìm thấy giao dịch</ThemedText>
+          <Ionicons name="receipt-outline" size={64} color={borderColor} />
+          <ThemedText style={[styles.errorText, { color: subtleText }]}>Không tìm thấy giao dịch</ThemedText>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
       <Stack.Screen options={{ title: "Chi tiết giao dịch" }} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Amount Card */}
-        <View style={styles.amountCard}>
-          <View style={styles.categoryIcon}>
+        <View style={[styles.amountCard, { backgroundColor: cardBg }]}>
+          <View style={[styles.categoryIcon, { backgroundColor: iconBg }]}>
             {transaction.category?.emoji ? (
               <ThemedText style={styles.emoji}>{transaction.category.emoji}</ThemedText>
             ) : (
-              <Ionicons name="receipt" size={32} color="#6366f1" />
+              <Ionicons name="receipt" size={32} color={accentColor} />
             )}
           </View>
 
-          <ThemedText style={styles.categoryName}>
+          <ThemedText style={[styles.categoryName, { color: labelText }]}>
             {transaction.category?.name || "Khác"}
           </ThemedText>
 
           <ThemedText
             style={[
               styles.amount,
-              transaction.type === "income" ? styles.amountIncome : styles.amountExpense,
+              { color: transaction.type === "income" ? incomeColor : expenseColor }
             ]}
           >
             {transaction.type === "income" ? "+" : "-"} {formatVND(transaction.amount)}
           </ThemedText>
 
           {transaction.note && (
-            <ThemedText style={styles.note}>{transaction.note}</ThemedText>
+            <ThemedText style={[styles.note, { color: subtleText }]}>{transaction.note}</ThemedText>
           )}
         </View>
 
         {/* Details */}
-        <View style={styles.detailsCard}>
+        <View style={[styles.detailsCard, { backgroundColor: cardBg }]}>
           <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={20} color="#6b7280" />
-            <ThemedText style={styles.detailLabel}>Ngày giao dịch</ThemedText>
-            <ThemedText style={styles.detailValue}>
+            <Ionicons name="calendar-outline" size={20} color={labelText} />
+            <ThemedText style={[styles.detailLabel, { color: labelText }]}>Ngày giao dịch</ThemedText>
+            <ThemedText style={[styles.detailValue, { color: text }]}>
               {formatDate(transaction.transaction_date)}
             </ThemedText>
           </View>
 
           <View style={styles.detailRow}>
-            <Ionicons name="person-outline" size={20} color="#6b7280" />
-            <ThemedText style={styles.detailLabel}>Người tạo</ThemedText>
-            <ThemedText style={styles.detailValue}>
+            <Ionicons name="person-outline" size={20} color={labelText} />
+            <ThemedText style={[styles.detailLabel, { color: labelText }]}>Người tạo</ThemedText>
+            <ThemedText style={[styles.detailValue, { color: text }]}>
               {transaction.creator?.display_name || "Bạn"}
             </ThemedText>
           </View>
@@ -211,10 +227,10 @@ export default function TransactionDetailScreen() {
             <Ionicons
               name={transaction.type === "income" ? "arrow-down" : "arrow-up"}
               size={20}
-              color="#6b7280"
+              color={labelText}
             />
-            <ThemedText style={styles.detailLabel}>Loại</ThemedText>
-            <ThemedText style={styles.detailValue}>
+            <ThemedText style={[styles.detailLabel, { color: labelText }]}>Loại</ThemedText>
+            <ThemedText style={[styles.detailValue, { color: text }]}>
               {transaction.type === "income" ? "Thu nhập" : "Chi tiêu"}
             </ThemedText>
           </View>
@@ -222,8 +238,8 @@ export default function TransactionDetailScreen() {
 
         {/* Split Participants */}
         {transaction.is_split && transaction.participants && transaction.participants.length > 0 && (
-          <View style={styles.participantsCard}>
-            <ThemedText style={styles.sectionTitle}>
+          <View style={[styles.participantsCard, { backgroundColor: cardBg }]}>
+            <ThemedText style={[styles.sectionTitle, { color: text }]}>
               Người tham gia ({transaction.participants.length})
             </ThemedText>
 
@@ -232,19 +248,19 @@ export default function TransactionDetailScreen() {
                 {participant.avatar_url ? (
                   <Image
                     source={{ uri: participant.avatar_url }}
-                    style={styles.participantAvatar}
+                    style={[styles.participantAvatar, { borderColor: borderColor }]}
                   />
                 ) : (
-                  <View style={[styles.participantAvatar, styles.avatarPlaceholder]}>
-                    <Ionicons name="person" size={20} color="#9ca3af" />
+                  <View style={[styles.participantAvatar, styles.avatarPlaceholder, { backgroundColor: iconBg, borderColor: borderColor }]}>
+                    <Ionicons name="person" size={20} color={subtleText} />
                   </View>
                 )}
 
-                <ThemedText style={styles.participantName}>
+                <ThemedText style={[styles.participantName, { color: text }]}>
                   {participant.display_name}
                 </ThemedText>
 
-                <ThemedText style={styles.participantAmount}>
+                <ThemedText style={[styles.participantAmount, { color: accentColor }]}>
                   {formatVND(participant.amount)}
                 </ThemedText>
               </View>
@@ -259,7 +275,6 @@ export default function TransactionDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
   },
   loadingContainer: {
     flex: 1,
@@ -274,7 +289,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: "#9ca3af",
   },
   scrollContent: {
     padding: isSmallScreen ? 16 : 20,
@@ -283,7 +297,6 @@ const styles = StyleSheet.create({
 
   // Amount Card
   amountCard: {
-    backgroundColor: "#fff",
     borderRadius: 20,
     padding: 32,
     alignItems: "center",
@@ -297,7 +310,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#eef2ff",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -308,7 +320,6 @@ const styles = StyleSheet.create({
   categoryName: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#6b7280",
     marginBottom: 8,
   },
   amount: {
@@ -316,22 +327,14 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     marginBottom: 8,
   },
-  amountIncome: {
-    color: "#22c55e",
-  },
-  amountExpense: {
-    color: "#ef4444",
-  },
   note: {
     fontSize: 15,
-    color: "#9ca3af",
     textAlign: "center",
     lineHeight: 22,
   },
 
   // Details Card
   detailsCard: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     gap: 16,
@@ -349,18 +352,15 @@ const styles = StyleSheet.create({
   detailLabel: {
     flex: 1,
     fontSize: 15,
-    color: "#6b7280",
     fontWeight: "600",
   },
   detailValue: {
     fontSize: 15,
-    color: "#111827",
     fontWeight: "700",
   },
 
   // Participants
   participantsCard: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     gap: 16,
@@ -373,7 +373,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#111827",
   },
   participantRow: {
     flexDirection: "row",
@@ -385,10 +384,8 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: "#f3f4f6",
   },
   avatarPlaceholder: {
-    backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -396,11 +393,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "600",
-    color: "#374151",
   },
   participantAmount: {
     fontSize: 15,
     fontWeight: "700",
-    color: "#6366f1",
   },
 });

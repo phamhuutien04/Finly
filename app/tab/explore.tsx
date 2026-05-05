@@ -7,7 +7,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Appearance,
     Platform,
     ScrollView,
     StyleSheet,
@@ -16,27 +15,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-
-// Chỉ import DateTimePicker khi không phải web
-let DateTimePicker: any = null;
-if (Platform.OS !== "web") {
-  DateTimePicker = require("@react-native-community/datetimepicker").default;
-}
-
-// Simple hook to get color scheme that works on all platforms
-function useColorScheme() {
-  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
-  
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setColorScheme(colorScheme);
-    });
-    
-    return () => subscription.remove();
-  }, []);
-  
-  return colorScheme;
-}
 
 type Category = {
   id: number;
@@ -51,7 +29,7 @@ export default function BudgetFormScreen() {
   const navigation = useNavigation();
   const { id } = useLocalSearchParams<{ id?: string }>();
   
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
   
   // Theme colors

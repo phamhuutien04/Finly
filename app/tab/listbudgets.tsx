@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Appearance,
     FlatList,
     Modal,
     Platform,
@@ -15,7 +14,7 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 // Chỉ import DateTimePicker khi không phải web
 let DateTimePicker: any = null;
@@ -24,22 +23,7 @@ if (Platform.OS !== "web") {
 }
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-
-// Simple hook to get color scheme that works on all platforms
-function useColorScheme() {
-  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
-  
-  useEffect(() => {
-    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      setColorScheme(colorScheme);
-    });
-    
-    return () => subscription.remove();
-  }, []);
-  
-  return colorScheme;
-}
+import { useAppColorScheme } from '@/contexts/ThemeContext';
 
 type Category = {
   id: number;
@@ -60,7 +44,7 @@ export default function BudgetListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
   const isDark = colorScheme === 'dark';
   
   // Theme colors
@@ -329,7 +313,7 @@ export default function BudgetListScreen() {
       : item.category?.name || 'Không có hạng mục';
 
     return (
-      <ThemedView style={[styles.card, { backgroundColor: cardBg, borderColor: borderColor }]}>
+      <View style={[styles.card, { backgroundColor: cardBg, borderColor: borderColor }]}>
         <View style={styles.cardContent}>
           <ThemedText style={[styles.category, { color: text }]}>
             {categoryName}
@@ -356,12 +340,12 @@ export default function BudgetListScreen() {
             <Text style={styles.buttonText}>Xóa</Text>
           </TouchableOpacity>
         </View>
-      </ThemedView>
+      </View>
     );
   };
 
   return (
-    <ThemedView style={[styles.container, { backgroundColor: screenBg }]}>
+    <View style={[styles.container, { backgroundColor: screenBg }]}>
       <ThemedText type="title" style={{ color: text }}>Danh sách Ngân sách</ThemedText>
       <ThemedText style={[styles.subtitle, { color: subtleText }]}>Quản lý ngân sách chi tiêu</ThemedText>
 
@@ -400,7 +384,7 @@ export default function BudgetListScreen() {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <ThemedView style={[styles.modalContent, { backgroundColor: modalBg }]}>
+          <View style={[styles.modalContent, { backgroundColor: modalBg }]}>
             <ThemedText style={[styles.modalTitle, { color: text }]}>Chỉnh sửa Ngân sách</ThemedText>
 
             <ScrollView style={{ maxHeight: 500 }}>
@@ -584,7 +568,7 @@ export default function BudgetListScreen() {
                 )}
               </Pressable>
             </View>
-          </ThemedView>
+          </View>
         </View>
       </Modal>
 
@@ -629,7 +613,7 @@ export default function BudgetListScreen() {
           </View>
         </View>
       </Modal>
-    </ThemedView>
+    </View>
   );
 }
 
