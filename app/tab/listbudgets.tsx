@@ -90,6 +90,21 @@ export default function BudgetListScreen() {
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Format number with thousand separators
+  const formatNumber = (value: string) => {
+    // Remove all non-digit characters
+    const numbers = value.replace(/[^\d]/g, '');
+    if (!numbers) return '';
+    
+    // Add thousand separators
+    return parseInt(numbers, 10).toLocaleString('vi-VN');
+  };
+
+  const handleAmountChange = (text: string) => {
+    const formatted = formatNumber(text);
+    setAmount(formatted);
+  };
+
   // Custom Alert state
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -174,7 +189,8 @@ export default function BudgetListScreen() {
   const openEditModal = (budget: Budget) => {
     setEditingBudget(budget);
     setSelectedCategoryId(budget.category_id);
-    setAmount(budget.amount.toString());
+    // Format the amount with thousand separators
+    setAmount(formatNumber(budget.amount.toString()));
     setPeriod(budget.period as 'monthly' | 'weekly' | 'custom');
     setStartDate(budget.start_date ? new Date(budget.start_date) : new Date());
     setEndDate(budget.end_date ? new Date(budget.end_date) : new Date());
@@ -183,7 +199,11 @@ export default function BudgetListScreen() {
 
   const handleSaveEdit = async () => {
     if (!editingBudget) return;
-    if (!amount || Number(amount) <= 0) return showAlert('Lỗi', 'Số tiền phải lớn hơn 0', 'error');
+    
+    // Parse formatted amount (remove dots)
+    const parsedAmount = Number(amount.replace(/\./g, ''));
+    
+    if (!amount || parsedAmount <= 0) return showAlert('Lỗi', 'Số tiền phải lớn hơn 0', 'error');
     if (!selectedCategoryId) return showAlert('Lỗi', 'Vui lòng chọn hạng mục', 'error');
     if (startDate > endDate) return showAlert('Lỗi', 'Ngày bắt đầu phải trước ngày kết thúc', 'error');
 
@@ -191,7 +211,7 @@ export default function BudgetListScreen() {
 
     const payload = {
       category_id: selectedCategoryId,
-      amount: Number(amount),
+      amount: parsedAmount,
       period,
       start_date: startDate.toISOString().split('T')[0],
       end_date: endDate.toISOString().split('T')[0],
@@ -411,9 +431,9 @@ export default function BudgetListScreen() {
               <TextInput
                 style={[styles.modalInput, { borderColor: borderColor, backgroundColor: inputBg, color: text }]}
                 value={amount}
-                onChangeText={setAmount}
+                onChangeText={handleAmountChange}
                 keyboardType="numeric"
-                placeholder="Ví dụ: 5000000"
+                placeholder="Ví dụ: 5.000.000"
                 placeholderTextColor={subtleText}
               />
 

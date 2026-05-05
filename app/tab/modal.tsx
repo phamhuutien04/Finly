@@ -3,6 +3,7 @@ import { Stack, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
+    Appearance,
     FlatList,
     Image,
     KeyboardAvoidingView,
@@ -19,6 +20,21 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { showError, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
+
+// Simple hook to get color scheme that works on all platforms
+function useColorScheme() {
+  const [colorScheme, setColorScheme] = useState(Appearance.getColorScheme());
+  
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setColorScheme(colorScheme);
+    });
+    
+    return () => subscription.remove();
+  }, []);
+  
+  return colorScheme;
+}
 
 // Import notification functions conditionally
 let requestNotificationPermissions: any = null;
@@ -73,6 +89,21 @@ const normalizeTxType = (t: any): TxType => (t === "income" ? "income" : "expens
 
 export default function ModalAddTransactionNoAccount() {
   const router = useRouter();
+  
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  
+  // Theme colors
+  const screenBg = isDark ? '#111827' : '#ffffff';
+  const cardBg = isDark ? '#1f2937' : '#f8f9fa';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#6b7280';
+  const borderColor = isDark ? '#374151' : '#e5e7eb';
+  const inputBg = isDark ? '#1f2937' : '#ffffff';
+  const modalBg = isDark ? '#1f2937' : '#ffffff';
+  const modalOverlayBg = isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)';
+  const accentColor = '#6366f1';
+  const selectedBg = isDark ? 'rgba(99,102,241,0.2)' : 'rgba(99,102,241,0.1)';
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,6 +123,18 @@ export default function ModalAddTransactionNoAccount() {
   const [selectedFriends, setSelectedFriends] = useState<Friend[]>([]);
   const [showFriendPicker, setShowFriendPicker] = useState<boolean>(false);
   const [friendSearchQuery, setFriendSearchQuery] = useState<string>("");
+
+  // Format number with thousand separators
+  const formatNumber = (value: string) => {
+    const numbers = value.replace(/[^\d]/g, '');
+    if (!numbers) return '';
+    return parseInt(numbers, 10).toLocaleString('vi-VN');
+  };
+
+  const handleAmountChange = (text: string) => {
+    const formatted = formatNumber(text);
+    setAmountText(formatted);
+  };
 
   const amountNumber = useMemo(() => {
     const cleaned = amountText.replace(/[^\d]/g, "");
@@ -548,37 +591,53 @@ export default function ModalAddTransactionNoAccount() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1 }}>
+      <SafeAreaView style={[{ flex: 1 }, { backgroundColor: screenBg }]}>
         <Stack.Screen options={{ title: "Thêm giao dịch" }} />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator />
+          <ActivityIndicator color={accentColor} />
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={[{ flex: 1 }, { backgroundColor: screenBg }]}>
       <Stack.Screen options={{ title: "Thêm giao dịch" }} />
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <ThemedView style={styles.screen}>
+        <ThemedView style={[styles.screen, { backgroundColor: screenBg }]}>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
             {/* Type switch */}
-            <ThemedText style={styles.label}>Loại</ThemedText>
+            <ThemedText style={[styles.label, { color: text }]}>Loại</ThemedText>
             <View style={styles.pillsRow}>
-              <Pressable onPress={() => setType("expense")} style={[styles.pill, type === "expense" && styles.pillOn]}>
-                <ThemedText style={[styles.pillText, type === "expense" && styles.pillTextOn]}>Chi tiêu</ThemedText>
+              <Pressable 
+                onPress={() => setType("expense")} 
+                style={[
+                  styles.pill, 
+                  { borderColor: borderColor, backgroundColor: type === "expense" ? '#ef4444' : inputBg }
+                ]}
+              >
+                <ThemedText style={[styles.pillText, { color: type === "expense" ? '#fff' : text }]}>
+                  Chi tiêu
+                </ThemedText>
               </Pressable>
 
-              <Pressable onPress={() => setType("income")} style={[styles.pill, type === "income" && styles.pillOn]}>
-                <ThemedText style={[styles.pillText, type === "income" && styles.pillTextOn]}>Thu nhập</ThemedText>
+              <Pressable 
+                onPress={() => setType("income")} 
+                style={[
+                  styles.pill, 
+                  { borderColor: borderColor, backgroundColor: type === "income" ? '#10b981' : inputBg }
+                ]}
+              >
+                <ThemedText style={[styles.pillText, { color: type === "income" ? '#fff' : text }]}>
+                  Thu nhập
+                </ThemedText>
               </Pressable>
             </View>
 
             {/* Category select */}
-            <ThemedText style={[styles.label, { marginTop: 14 }]}>Danh mục</ThemedText>
-            <View style={styles.selectBox}>
+            <ThemedText style={[styles.label, { marginTop: 14, color: text }]}>Danh mục</ThemedText>
+            <View style={[styles.selectBox, { borderColor: borderColor, backgroundColor: cardBg }]}>
               {filteredCategories.map((c) => {
                 const idStr = String(c.id);
                 const selected = idStr === categoryId;
@@ -587,10 +646,13 @@ export default function ModalAddTransactionNoAccount() {
                   <Pressable
                     key={idStr}
                     onPress={() => setCategoryId(idStr)}
-                    style={[styles.selectItem, selected && styles.selectItemOn]}
+                    style={[
+                      styles.selectItem, 
+                      { borderColor: borderColor, backgroundColor: selected ? selectedBg : 'transparent' }
+                    ]}
                   >
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={styles.iconBox}>
+                      <View style={[styles.iconBox, { borderColor: borderColor }]}>
                         {c.icon_uri ? (
                           <Image source={{ uri: c.icon_uri }} style={{ width: 22, height: 22, borderRadius: 6 }} />
                         ) : (
@@ -598,7 +660,7 @@ export default function ModalAddTransactionNoAccount() {
                         )}
                       </View>
 
-                      <ThemedText style={{ fontWeight: "800" }}>
+                      <ThemedText style={{ fontWeight: "800", color: text }}>
                         {c.name ?? "Khác"}
                       </ThemedText>
                     </View>
@@ -607,7 +669,7 @@ export default function ModalAddTransactionNoAccount() {
               })}
 
               {filteredCategories.length === 0 && (
-                <ThemedText style={{ opacity: 0.7 }}>
+                <ThemedText style={{ opacity: 0.7, color: subtleText }}>
                   Không có danh mục cho "{type === "expense" ? "Chi tiêu" : "Thu nhập"}".
                   Hãy tạo thêm trong bảng categories.
                 </ThemedText>
@@ -615,21 +677,22 @@ export default function ModalAddTransactionNoAccount() {
             </View>
 
             {/* Amount */}
-            <ThemedText style={[styles.label, { marginTop: 14 }]}>Số tiền</ThemedText>
-            <View style={styles.inputWrap}>
+            <ThemedText style={[styles.label, { marginTop: 14, color: text }]}>Số tiền</ThemedText>
+            <View style={[styles.inputWrap, { borderColor: borderColor, backgroundColor: inputBg }]}>
               <TextInput
                 value={amountText}
-                onChangeText={setAmountText}
-                placeholder="vd: 35000"
+                onChangeText={handleAmountChange}
+                placeholder="Ví dụ: 35.000"
+                placeholderTextColor={subtleText}
                 keyboardType="number-pad"
-                style={styles.input}
+                style={[styles.input, { color: text }]}
               />
             </View>
 
             {/* Transaction Date */}
-            <ThemedText style={[styles.label, { marginTop: 14 }]}>Ngày giao dịch</ThemedText>
-            <Pressable onPress={() => setShowDatePicker(true)} style={styles.inputWrap}>
-              <ThemedText style={{ fontSize: 15 }}>
+            <ThemedText style={[styles.label, { marginTop: 14, color: text }]}>Ngày giao dịch</ThemedText>
+            <Pressable onPress={() => setShowDatePicker(true)} style={[styles.inputWrap, { borderColor: borderColor, backgroundColor: inputBg }]}>
+              <ThemedText style={{ fontSize: 15, color: text }}>
                 {transactionDate.toLocaleDateString("vi-VN", {
                   year: "numeric",
                   month: "2-digit",
@@ -659,7 +722,7 @@ export default function ModalAddTransactionNoAccount() {
                 {Platform.OS === "ios" && (
                   <Pressable
                     onPress={() => setShowDatePicker(false)}
-                    style={[styles.btn, { marginTop: 8, backgroundColor: "#007AFF" }]}
+                    style={[styles.btn, { marginTop: 8, backgroundColor: accentColor }]}
                   >
                     <ThemedText style={styles.btnText}>Xong</ThemedText>
                   </Pressable>
@@ -669,9 +732,9 @@ export default function ModalAddTransactionNoAccount() {
 
             {/* Date Picker for Web */}
             {Platform.OS === "web" && showDatePicker && (
-              <View style={styles.webDatePicker}>
-                <View style={styles.webDatePickerContent}>
-                  <ThemedText style={[styles.label, { marginBottom: 12 }]}>Chọn ngày và giờ</ThemedText>
+              <View style={[styles.webDatePicker, { backgroundColor: modalOverlayBg }]}>
+                <View style={[styles.webDatePickerContent, { backgroundColor: modalBg }]}>
+                  <ThemedText style={[styles.label, { marginBottom: 12, color: text }]}>Chọn ngày và giờ</ThemedText>
                   
                   <input
                     type="datetime-local"
@@ -690,24 +753,26 @@ export default function ModalAddTransactionNoAccount() {
                       paddingTop: 12,
                       paddingBottom: 12,
                       borderWidth: 0.5,
-                      borderColor: "rgba(127,127,127,0.25)",
+                      border: `1px solid ${borderColor}`,
                       marginBottom: 12,
                       width: "100%",
+                      backgroundColor: inputBg,
+                      color: text,
                     }}
                   />
 
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     <Pressable
                       onPress={() => setShowDatePicker(false)}
-                      style={[styles.btn, { flex: 1, backgroundColor: "#007AFF" }]}
+                      style={[styles.btn, { flex: 1, backgroundColor: accentColor }]}
                     >
                       <ThemedText style={styles.btnText}>Xác nhận</ThemedText>
                     </Pressable>
                     <Pressable
                       onPress={() => setShowDatePicker(false)}
-                      style={[styles.btnGhost, { flex: 1 }]}
+                      style={[styles.btnGhost, { flex: 1, borderColor: borderColor }]}
                     >
-                      <ThemedText style={styles.btnGhostText}>Hủy</ThemedText>
+                      <ThemedText style={[styles.btnGhostText, { color: text }]}>Hủy</ThemedText>
                     </Pressable>
                   </View>
                 </View>
@@ -715,15 +780,21 @@ export default function ModalAddTransactionNoAccount() {
             )}
 
             {/* Note */}
-            <ThemedText style={[styles.label, { marginTop: 14 }]}>Ghi chú</ThemedText>
-            <View style={styles.inputWrap}>
-              <TextInput value={note} onChangeText={setNote} placeholder="vd: Trà sữa" style={styles.input} />
+            <ThemedText style={[styles.label, { marginTop: 14, color: text }]}>Ghi chú</ThemedText>
+            <View style={[styles.inputWrap, { borderColor: borderColor, backgroundColor: inputBg }]}>
+              <TextInput 
+                value={note} 
+                onChangeText={setNote} 
+                placeholder="Ví dụ: Trà sữa" 
+                placeholderTextColor={subtleText}
+                style={[styles.input, { color: text }]} 
+              />
             </View>
 
             {/* Split with Friends */}
             {type === "expense" && (
               <>
-                <ThemedText style={[styles.label, { marginTop: 14 }]}>Chia tiền với bạn bè</ThemedText>
+                <ThemedText style={[styles.label, { marginTop: 14, color: text }]}>Chia tiền với bạn bè</ThemedText>
                 
                 {/* Selected Friends */}
                 {selectedFriends.length > 0 && (
@@ -731,14 +802,14 @@ export default function ModalAddTransactionNoAccount() {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                       {selectedFriends.map((friend) => (
                         <View key={friend.user_id} style={styles.selectedFriendItem}>
-                          <View style={styles.friendAvatar}>
+                          <View style={[styles.friendAvatar, { backgroundColor: isDark ? '#374151' : '#f3f4f6' }]}>
                             {friend.avatar_url ? (
                               <Image source={{ uri: friend.avatar_url }} style={styles.friendAvatarImage} />
                             ) : (
-                              <Ionicons name="person" size={20} color="#9ca3af" />
+                              <Ionicons name="person" size={20} color={subtleText} />
                             )}
                           </View>
-                          <ThemedText style={styles.friendName} numberOfLines={1}>
+                          <ThemedText style={[styles.friendName, { color: text }]} numberOfLines={1}>
                             {friend.display_name || "Bạn"}
                           </ThemedText>
                           <Pressable
@@ -754,17 +825,17 @@ export default function ModalAddTransactionNoAccount() {
                 )}
 
                 {/* Add Friends Button */}
-                <Pressable onPress={() => setShowFriendPicker(true)} style={styles.addFriendButton}>
-                  <Ionicons name="person-add" size={20} color="#6366f1" />
-                  <ThemedText style={styles.addFriendButtonText}>
+                <Pressable onPress={() => setShowFriendPicker(true)} style={[styles.addFriendButton, { borderColor: accentColor }]}>
+                  <Ionicons name="person-add" size={20} color={accentColor} />
+                  <ThemedText style={[styles.addFriendButtonText, { color: accentColor }]}>
                     {selectedFriends.length > 0 ? "Thêm bạn khác" : "Thêm bạn bè"}
                   </ThemedText>
                 </Pressable>
 
                 {/* Split Amount Display */}
                 {selectedFriends.length > 0 && amountNumber > 0 && (
-                  <View style={styles.splitInfoContainer}>
-                    <ThemedText style={styles.splitInfoText}>
+                  <View style={[styles.splitInfoContainer, { backgroundColor: isDark ? 'rgba(59,130,246,0.1)' : '#f0f9ff', borderColor: isDark ? '#1e40af' : '#bae6fd' }]}>
+                    <ThemedText style={[styles.splitInfoText, { color: isDark ? '#93c5fd' : '#0369a1' }]}>
                       Tổng: {amountNumber.toLocaleString('vi-VN')}đ ÷ {selectedFriends.length + 1} người = {splitAmount.toLocaleString('vi-VN')}đ/người
                     </ThemedText>
                   </View>
@@ -774,20 +845,21 @@ export default function ModalAddTransactionNoAccount() {
 
             {/* Friend Picker Modal */}
             {showFriendPicker && (
-              <View style={styles.friendPickerModal}>
-                <View style={styles.friendPickerContent}>
+              <View style={[styles.friendPickerModal, { backgroundColor: modalOverlayBg }]}>
+                <View style={[styles.friendPickerContent, { backgroundColor: modalBg }]}>
                   <View style={styles.friendPickerHeader}>
-                    <ThemedText style={styles.friendPickerTitle}>Chọn bạn bè</ThemedText>
+                    <ThemedText style={[styles.friendPickerTitle, { color: text }]}>Chọn bạn bè</ThemedText>
                     <Pressable onPress={() => setShowFriendPicker(false)}>
-                      <Ionicons name="close" size={24} color="#6b7280" />
+                      <Ionicons name="close" size={24} color={subtleText} />
                     </Pressable>
                   </View>
 
-                  <View style={styles.friendSearchContainer}>
-                    <Ionicons name="search" size={20} color="#9ca3af" />
+                  <View style={[styles.friendSearchContainer, { backgroundColor: isDark ? '#374151' : '#f9fafb' }]}>
+                    <Ionicons name="search" size={20} color={subtleText} />
                     <TextInput
-                      style={styles.friendSearchInput}
+                      style={[styles.friendSearchInput, { color: text }]}
                       placeholder="Tìm kiếm bạn bè..."
+                      placeholderTextColor={subtleText}
                       value={friendSearchQuery}
                       onChangeText={setFriendSearchQuery}
                     />
@@ -801,7 +873,10 @@ export default function ModalAddTransactionNoAccount() {
                       const isSelected = selectedFriends.some(f => f.user_id === item.user_id);
                       return (
                         <Pressable
-                          style={[styles.friendItem, isSelected && styles.friendItemSelected]}
+                          style={[
+                            styles.friendItem, 
+                            { backgroundColor: isSelected ? selectedBg : 'transparent' }
+                          ]}
                           onPress={() => {
                             if (isSelected) {
                               setSelectedFriends(prev => prev.filter(f => f.user_id !== item.user_id));
@@ -810,24 +885,27 @@ export default function ModalAddTransactionNoAccount() {
                             }
                           }}
                         >
-                          <View style={styles.friendAvatar}>
+                          <View style={[styles.friendAvatar, { backgroundColor: isDark ? '#374151' : '#f3f4f6' }]}>
                             {item.avatar_url ? (
                               <Image source={{ uri: item.avatar_url }} style={styles.friendAvatarImage} />
                             ) : (
-                              <Ionicons name="person" size={24} color="#9ca3af" />
+                              <Ionicons name="person" size={24} color={subtleText} />
                             )}
                           </View>
                           <View style={styles.friendInfo}>
-                            <ThemedText style={styles.friendDisplayName}>
+                            <ThemedText style={[styles.friendDisplayName, { color: text }]}>
                               {item.display_name || "Bạn"}
                             </ThemedText>
                             {item.email && (
-                              <ThemedText style={styles.friendEmail}>
+                              <ThemedText style={[styles.friendEmail, { color: subtleText }]}>
                                 {item.email}
                               </ThemedText>
                             )}
                           </View>
-                          <View style={[styles.friendCheckbox, isSelected && styles.friendCheckboxSelected]}>
+                          <View style={[
+                            styles.friendCheckbox, 
+                            { borderColor: isSelected ? accentColor : borderColor, backgroundColor: isSelected ? accentColor : 'transparent' }
+                          ]}>
                             {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
                           </View>
                         </Pressable>
@@ -835,8 +913,8 @@ export default function ModalAddTransactionNoAccount() {
                     }}
                     ListEmptyComponent={
                       <View style={styles.emptyFriends}>
-                        <Ionicons name="people-outline" size={48} color="#d1d5db" />
-                        <ThemedText style={styles.emptyFriendsText}>
+                        <Ionicons name="people-outline" size={48} color={borderColor} />
+                        <ThemedText style={[styles.emptyFriendsText, { color: subtleText }]}>
                           {friendSearchQuery ? "Không tìm thấy bạn bè" : "Chưa có bạn bè nào"}
                         </ThemedText>
                       </View>
@@ -845,7 +923,7 @@ export default function ModalAddTransactionNoAccount() {
 
                   <Pressable
                     onPress={() => setShowFriendPicker(false)}
-                    style={styles.friendPickerDoneButton}
+                    style={[styles.friendPickerDoneButton, { backgroundColor: accentColor }]}
                   >
                     <ThemedText style={styles.friendPickerDoneText}>
                       Xong ({selectedFriends.length})
@@ -856,12 +934,12 @@ export default function ModalAddTransactionNoAccount() {
             )}
 
             {/* Save */}
-            <Pressable onPress={save} disabled={saving} style={[styles.btn, saving && { opacity: 0.6 }]}>
-              {saving ? <ActivityIndicator /> : <ThemedText style={styles.btnText}>Lưu giao dịch</ThemedText>}
+            <Pressable onPress={save} disabled={saving} style={[styles.btn, { backgroundColor: accentColor }, saving && { opacity: 0.6 }]}>
+              {saving ? <ActivityIndicator color="#fff" /> : <ThemedText style={styles.btnText}>Lưu giao dịch</ThemedText>}
             </Pressable>
 
-            <Pressable onPress={() => router.back()} disabled={saving} style={styles.btnGhost}>
-              <ThemedText style={styles.btnGhostText}>Hủy</ThemedText>
+            <Pressable onPress={() => router.back()} disabled={saving} style={[styles.btnGhost, { borderColor: borderColor }]}>
+              <ThemedText style={[styles.btnGhostText, { color: text }]}>Hủy</ThemedText>
             </Pressable>
           </ScrollView>
         </ThemedView>
@@ -881,17 +959,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 10,
     alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.35)",
+    borderWidth: 1,
   },
-  pillOn: { backgroundColor: "rgba(127,127,127,0.12)" },
-  pillText: { fontWeight: "900", opacity: 0.85 },
-  pillTextOn: { opacity: 1 },
 
   selectBox: {
     borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderWidth: 1,
     padding: 8,
     gap: 8,
   },
@@ -899,10 +972,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderRadius: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.15)",
+    borderWidth: 1,
   },
-  selectItemOn: { backgroundColor: "rgba(127,127,127,0.12)" },
 
   iconBox: {
     width: 32,
@@ -910,16 +981,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderWidth: 1,
   },
 
   inputWrap: {
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderWidth: 1,
   },
   input: { fontSize: 15 },
 
@@ -927,7 +996,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 13,
     borderRadius: 16,
-    backgroundColor: "#111",
     alignItems: "center",
   },
   btnText: { color: "#fff", fontWeight: "900" },
@@ -937,8 +1005,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
+    borderWidth: 1,
   },
   btnGhostText: { fontWeight: "900", opacity: 0.9 },
 
@@ -948,13 +1015,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
   },
   webDatePickerContent: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     width: "90%",
@@ -974,7 +1039,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,
@@ -1005,23 +1069,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#6366f1",
     borderStyle: "dashed",
     marginBottom: 12,
   },
   addFriendButtonText: {
-    color: "#6366f1",
     fontWeight: "700",
   },
   splitInfoContainer: {
-    backgroundColor: "#f0f9ff",
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#bae6fd",
   },
   splitInfoText: {
-    color: "#0369a1",
     fontWeight: "600",
     textAlign: "center",
   },
@@ -1033,13 +1092,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
   },
   friendPickerContent: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 20,
     width: "90%",
@@ -1059,7 +1116,6 @@ const styles = StyleSheet.create({
   friendSearchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1081,9 +1137,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
   },
-  friendItemSelected: {
-    backgroundColor: "#f0f9ff",
-  },
   friendInfo: {
     flex: 1,
     marginLeft: 12,
@@ -1094,7 +1147,6 @@ const styles = StyleSheet.create({
   },
   friendEmail: {
     fontSize: 14,
-    color: "#6b7280",
     marginTop: 2,
   },
   friendCheckbox: {
@@ -1102,25 +1154,18 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#d1d5db",
     alignItems: "center",
     justifyContent: "center",
-  },
-  friendCheckboxSelected: {
-    backgroundColor: "#6366f1",
-    borderColor: "#6366f1",
   },
   emptyFriends: {
     alignItems: "center",
     paddingVertical: 40,
   },
   emptyFriendsText: {
-    color: "#9ca3af",
     marginTop: 12,
     textAlign: "center",
   },
   friendPickerDoneButton: {
-    backgroundColor: "#6366f1",
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
