@@ -20,6 +20,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { useTheme } from "@/contexts/ThemeContext";
 import { showAlert, showConfirm, showError, showInfo, showSuccess, showWarning } from "@/lib/globalAlert";
 import { supabase } from "@/lib/supabase";
 
@@ -46,7 +47,32 @@ type User = {
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [darkMode, setDarkMode] = useState(false);
+  const { isDark, themeMode, setThemeMode } = useTheme();
+  
+  // Dark mode toggle state
+  const [darkMode, setDarkMode] = useState(isDark);
+  
+  // Update when theme changes
+  React.useEffect(() => {
+    setDarkMode(isDark);
+  }, [isDark]);
+  
+  // Handle dark mode toggle
+  const handleDarkModeToggle = (value: boolean) => {
+    setDarkMode(value);
+    // Set theme mode: dark or light (not system)
+    setThemeMode(value ? 'dark' : 'light');
+  };
+  
+  // Improved light/dark theme with better contrast
+  const screenBg = isDark ? '#111827' : '#f5f5f5';
+  const cardBg = isDark ? '#1f2937' : '#ffffff';
+  const text = isDark ? '#f9fafb' : '#1f2937';
+  const subtleText = isDark ? '#9ca3af' : '#64748b';
+  const borderColor = isDark ? '#374151' : '#d1d5db';
+  const inputBg = isDark ? '#1f2937' : '#ffffff';
+  const accentColor = '#6366f1';
+  
   const [biometric, setBiometric] = useState(false);
   const [pushNoti, setPushNoti] = useState(true);
   const [weeklyReport, setWeeklyReport] = useState(true);
@@ -503,41 +529,41 @@ export default function SettingsScreen() {
   };
 
   return (
-    <ThemedView style={styles.page}>
+    <ThemedView style={{ ...styles.page, backgroundColor: screenBg }}>
       <Stack.Screen options={{ title: "Cài đặt" }} />
 
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Profile */}
-        <ThemedView style={styles.profileCard}>
+        <ThemedView style={{ ...styles.profileCard, backgroundColor: cardBg, borderColor: borderColor }}>
           <Pressable onPress={pickAvatar} style={styles.avatarContainer}>
             {uploadingAvatar ? (
-              <View style={styles.avatar}>
-                <ActivityIndicator size="small" color="#3B82F6" />
+              <View style={{ ...styles.avatar, backgroundColor: inputBg }}>
+                <ActivityIndicator size="small" color={accentColor} />
               </View>
             ) : currentUser?.avatar_url ? (
               <Image source={{ uri: currentUser.avatar_url }} style={styles.avatarImage} />
             ) : (
-              <ThemedView style={styles.avatar}>
-                <ThemedText style={styles.avatarText}>
+              <ThemedView style={{ ...styles.avatar, backgroundColor: inputBg }}>
+                <ThemedText style={{ ...styles.avatarText, color: subtleText }}>
                   {currentUser?.display_name?.charAt(0)?.toUpperCase() || 
                    currentUser?.email?.charAt(0)?.toUpperCase() || '?'}
                 </ThemedText>
               </ThemedView>
             )}
-            <View style={styles.avatarBadge}>
+            <View style={{ ...styles.avatarBadge, backgroundColor: accentColor, borderColor: cardBg }}>
               <ThemedText style={styles.avatarBadgeText}>📷</ThemedText>
             </View>
           </Pressable>
           
           <View style={{ flex: 1 }}>
-            <ThemedText type="subtitle">
+            <ThemedText type="subtitle" style={{ color: text }}>
               {loadingProfile ? 'Đang tải...' : (currentUser?.display_name || currentUser?.email || 'Người dùng')}
             </ThemedText>
-            <ThemedText style={styles.muted}>
+            <ThemedText style={{ ...styles.muted, color: subtleText }}>
               {currentUser?.email || 'Chưa có email'} • {Platform.OS.toUpperCase()}
             </ThemedText>
             {currentUser?.phone && (
-              <ThemedText style={styles.muted}>
+              <ThemedText style={{ ...styles.muted, color: subtleText }}>
                 📱 {currentUser.phone}
               </ThemedText>
             )}
@@ -545,62 +571,73 @@ export default function SettingsScreen() {
 
           <Pressable
             onPress={editCurrentUserProfile}
-            style={({ pressed }) => [styles.outlineBtn, pressed && { opacity: 0.75 }]}
+            style={({ pressed }) => [
+              { ...styles.outlineBtn, borderColor: borderColor },
+              pressed && { opacity: 0.75 }
+            ]}
           >
-            <ThemedText style={styles.outlineBtnText}>Sửa</ThemedText>
+            <ThemedText style={{ ...styles.outlineBtnText, color: text }}>Sửa</ThemedText>
           </Pressable>
         </ThemedView>
 
-        <Section title="Tuỳ chọn">
+        <Section title="Tuỳ chọn" borderColor={borderColor}>
           <RowSwitch
             title="Dark Mode"
             subtitle="Giao diện tối dễ nhìn ban đêm"
             value={darkMode}
-            onValueChange={setDarkMode}
+            onValueChange={handleDarkModeToggle}
+            borderColor={borderColor}
           />
           <RowSwitch
             title="Thông báo đẩy"
             subtitle="Nhắc nhở ghi chi tiêu hằng ngày"
             value={pushNoti}
             onValueChange={setPushNoti}
+            borderColor={borderColor}
           />
           <RowSwitch
             title="Báo cáo tuần"
             subtitle="Gửi tổng kết chi tiêu mỗi tuần"
             value={weeklyReport}
             onValueChange={setWeeklyReport}
+            borderColor={borderColor}
           />
           <RowPress
             title="Ngôn ngữ"
             subtitle={language.label}
             onPress={() => pickOption("Chọn ngôn ngữ", languages, language, setLanguage)}
+            borderColor={borderColor}
           />
           <RowPress
             title="Tiền tệ"
             subtitle={currency.label}
             onPress={() => pickOption("Chọn tiền tệ", currencies, currency, setCurrency)}
+            borderColor={borderColor}
           />
         </Section>
 
-        <Section title="Bảo mật">
+        <Section title="Bảo mật" borderColor={borderColor}>
           <RowSwitch
             title="Mở khoá sinh trắc học"
             subtitle="Vân tay / FaceID (nếu thiết bị hỗ trợ)"
             value={biometric}
             onValueChange={setBiometric}
+            borderColor={borderColor}
           />
           <RowPress
             title="Đổi mã PIN"
             subtitle="Thiết lập PIN để mở app"
             onPress={() => showInfo("PIN", "Gắn màn hình đổi PIN vào đây.")}
+            borderColor={borderColor}
           />
         </Section>
 
-        <Section title="Tích hợp API">
+        <Section title="Tích hợp API" borderColor={borderColor}>
           <RowPress
             title="API Key"
             subtitle={sepayApiKey ? '••••••••' + sepayApiKey.slice(-4) : 'Chưa cài đặt'}
             onPress={() => setShowSepayModal(true)}
+            borderColor={borderColor}
           />
           {sepayApiKey && (
             <>
@@ -608,43 +645,49 @@ export default function SettingsScreen() {
                 title="Đồng bộ giao dịch ngân hàng"
                 subtitle="Tự động phân loại chi tiêu"
                 onPress={handleSyncSepay}
+                borderColor={borderColor}
               />
               <RowDanger
                 title="Xoá API Key"
                 subtitle="Xoá key đã lưu"
                 onPress={removeSepayApiKey}
+                borderColor={borderColor}
               />
             </>
           )}
         </Section>
 
-        <Section title="Dữ liệu">
+        <Section title="Dữ liệu" borderColor={borderColor}>
           <RowPress
             title="Sao lưu dữ liệu"
             subtitle="Xuất dữ liệu ra file Excel"
             onPress={() => setShowExportModal(true)}
+            borderColor={borderColor}
           />
           <RowPress
             title="Khôi phục dữ liệu"
             subtitle="Nhập lại từ bản sao lưu"
             onPress={() => showInfo("Restore", "Import CSV/JSON ở đây.")}
+            borderColor={borderColor}
           />
         </Section>
 
-        <Section title="Thông tin">
+        <Section title="Thông tin" borderColor={borderColor}>
           <RowPress
             title="Giới thiệu"
             subtitle="Phiên bản 1.0.0"
             onPress={() => showInfo("About", "App quản lí chi tiêu • Finly")}
+            borderColor={borderColor}
           />
           <RowPress
             title="Điều khoản & Chính sách"
             subtitle="Xem nội dung"
             onPress={() => showInfo("Policy", "Mở trang Terms/Privacy ở đây.")}
+            borderColor={borderColor}
           />
         </Section>
 
-        <Section title="Khu vực nguy hiểm" danger>
+        <Section title="Khu vực nguy hiểm" danger borderColor={borderColor}>
           <RowDanger
             title="Xoá toàn bộ dữ liệu"
             subtitle="Không thể khôi phục"
@@ -653,6 +696,7 @@ export default function SettingsScreen() {
                 showSuccess("Đã xoá", "Mình đã xoá dữ liệu (demo).")
               )
             }
+            borderColor={borderColor}
           />
           <RowDanger
             title="Đăng xuất"
@@ -676,6 +720,7 @@ export default function SettingsScreen() {
                 }
               })
             }
+            borderColor={borderColor}
           />
         </Section>
 
@@ -695,50 +740,66 @@ export default function SettingsScreen() {
             onPress={() => setShowEditProfileModal(false)}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
-              <ThemedView style={styles.editModalContent}>
-                <ThemedText type="subtitle" style={{ marginBottom: 16 }}>
+              <ThemedView style={{ ...styles.editModalContent, backgroundColor: cardBg }}>
+                <ThemedText type="subtitle" style={{ marginBottom: 16, color: text }}>
                   Chỉnh sửa thông tin cá nhân
                 </ThemedText>
 
-                <ThemedText style={styles.label}>Email</ThemedText>
+                <ThemedText style={{ ...styles.label, color: text }}>Email</ThemedText>
                 <TextInput
-                  style={[styles.input, styles.inputDisabled]}
+                  style={[
+                    styles.input,
+                    styles.inputDisabled,
+                    { borderColor: borderColor, backgroundColor: inputBg, color: subtleText }
+                  ]}
                   value={currentUser?.email || ''}
                   editable={false}
                   placeholder="Email"
-                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  placeholderTextColor={subtleText}
                 />
-                <ThemedText style={styles.helperText}>Email không thể thay đổi</ThemedText>
+                <ThemedText style={{ ...styles.helperText, color: subtleText }}>Email không thể thay đổi</ThemedText>
 
-                <ThemedText style={styles.label}>Tên hiển thị</ThemedText>
+                <ThemedText style={{ ...styles.label, color: text }}>Tên hiển thị</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { borderColor: borderColor, backgroundColor: inputBg, color: text }
+                  ]}
                   value={profileForm.display_name}
                   onChangeText={(text) => setProfileForm({ ...profileForm, display_name: text })}
                   placeholder="Nhập tên hiển thị"
-                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  placeholderTextColor={subtleText}
                 />
 
-                <ThemedText style={styles.label}>Số điện thoại</ThemedText>
+                <ThemedText style={{ ...styles.label, color: text }}>Số điện thoại</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { borderColor: borderColor, backgroundColor: inputBg, color: text }
+                  ]}
                   value={profileForm.phone}
                   onChangeText={(text) => setProfileForm({ ...profileForm, phone: text })}
                   placeholder="Nhập số điện thoại"
-                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  placeholderTextColor={subtleText}
                   keyboardType="phone-pad"
                 />
 
                 <View style={styles.editModalActions}>
                   <Pressable
                     onPress={() => setShowEditProfileModal(false)}
-                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      { ...styles.cancelBtn, backgroundColor: inputBg },
+                      pressed && { opacity: 0.7 }
+                    ]}
                   >
-                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                    <ThemedText style={{ ...styles.cancelBtnText, color: text }}>Huỷ</ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={saveProfileChanges}
-                    style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      { ...styles.saveBtn, backgroundColor: accentColor },
+                      pressed && { opacity: 0.7 }
+                    ]}
                   >
                     <ThemedText style={styles.saveBtnText}>Lưu</ThemedText>
                   </Pressable>
@@ -762,40 +823,46 @@ export default function SettingsScreen() {
             onPress={() => setShowSepayModal(false)}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
-              <ThemedView style={styles.editModalContent}>
-                <ThemedText type="subtitle" style={{ marginBottom: 8 }}>
+              <ThemedView style={{ ...styles.editModalContent, backgroundColor: cardBg }}>
+                <ThemedText type="subtitle" style={{ marginBottom: 8, color: text }}>
                   Cài đặt Sepay API Key
                 </ThemedText>
-                <ThemedText style={[styles.helperText, { marginTop: 0, marginBottom: 16 }]}>
+                <ThemedText style={[styles.helperText, { marginTop: 0, marginBottom: 16, color: subtleText }]}>
                   Nhập API key từ Sepay để tự động đồng bộ giao dịch ngân hàng
                 </ThemedText>
 
-                <ThemedText style={styles.label}>API Key</ThemedText>
+                <ThemedText style={{ ...styles.label, color: text }}>API Key</ThemedText>
                 <TextInput
-                  style={styles.input}
+                  style={[
+                    styles.input,
+                    { borderColor: borderColor, backgroundColor: inputBg, color: text }
+                  ]}
                   value={sepayApiKey}
                   onChangeText={setSepayApiKey}
                   placeholder="Nhập Sepay API key"
-                  placeholderTextColor="rgba(127,127,127,0.5)"
+                  placeholderTextColor={subtleText}
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <ThemedText style={styles.helperText}>
+                <ThemedText style={{ ...styles.helperText, color: subtleText }}>
                   Lấy API key tại: https://my.sepay.vn
                 </ThemedText>
 
                 <View style={styles.editModalActions}>
                   <Pressable
                     onPress={() => setShowSepayModal(false)}
-                    style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      { ...styles.cancelBtn, backgroundColor: inputBg },
+                      pressed && { opacity: 0.7 }
+                    ]}
                   >
-                    <ThemedText style={styles.cancelBtnText}>Huỷ</ThemedText>
+                    <ThemedText style={{ ...styles.cancelBtnText, color: text }}>Huỷ</ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={saveSepayApiKey}
                     disabled={savingSepayKey}
                     style={({ pressed }) => [
-                      styles.saveBtn,
+                      { ...styles.saveBtn, backgroundColor: accentColor },
                       savingSepayKey && styles.saveBtnDisabled,
                       pressed && { opacity: 0.7 }
                     ]}
@@ -819,7 +886,10 @@ export default function SettingsScreen() {
           visible={showExportModal}
           animationType="slide"
           transparent
-          onRequestClose={() => setShowExportModal(false)}
+          onRequestClose={() => {
+            setShowExportModal(false);
+            setExportType(null);
+          }}
         >
           <Pressable 
             style={styles.exportModalOverlay}
@@ -829,25 +899,25 @@ export default function SettingsScreen() {
             }}
           >
             <Pressable onPress={(e) => e.stopPropagation()}>
-              <ThemedView style={styles.exportModalContent}>
-                <View style={styles.exportModalHandle} />
+              <ThemedView style={{ ...styles.exportModalContent, backgroundColor: cardBg }}>
+                <View style={{ ...styles.exportModalHandle, backgroundColor: borderColor }} />
                 
-                <ThemedText style={styles.exportModalTitle}>Xuất dữ liệu</ThemedText>
-                <ThemedText style={styles.exportModalSubtitle}>Chọn loại giao dịch</ThemedText>
+                <ThemedText style={{ ...styles.exportModalTitle, color: text }}>Xuất dữ liệu</ThemedText>
+                <ThemedText style={{ ...styles.exportModalSubtitle, color: subtleText }}>Chọn loại giao dịch</ThemedText>
                 
                 <View style={styles.exportOptionsContainer}>
                   <Pressable
                     onPress={() => setExportType('income')}
                     style={[
-                      styles.exportOptionCard,
+                      { ...styles.exportOptionCard, backgroundColor: inputBg },
                       exportType === 'income' && styles.exportOptionCardSelected
                     ]}
                   >
                     <View style={[styles.exportOptionIcon, { backgroundColor: '#10B981' }]}>
                       <ThemedText style={styles.exportOptionEmoji}>💰</ThemedText>
                     </View>
-                    <ThemedText style={styles.exportOptionTitle}>Thu nhập</ThemedText>
-                    <ThemedText style={styles.exportOptionDesc}>Xuất tất cả giao dịch</ThemedText>
+                    <ThemedText style={{ ...styles.exportOptionTitle, color: text }}>Thu nhập</ThemedText>
+                    <ThemedText style={{ ...styles.exportOptionDesc, color: subtleText }}>Xuất tất cả giao dịch</ThemedText>
                     {exportType === 'income' && (
                       <View style={styles.exportCheckmark}>
                         <ThemedText style={styles.exportCheckmarkText}>✓</ThemedText>
@@ -858,15 +928,15 @@ export default function SettingsScreen() {
                   <Pressable
                     onPress={() => setExportType('expense')}
                     style={[
-                      styles.exportOptionCard,
+                      { ...styles.exportOptionCard, backgroundColor: inputBg },
                       exportType === 'expense' && styles.exportOptionCardSelected
                     ]}
                   >
                     <View style={[styles.exportOptionIcon, { backgroundColor: '#EF4444' }]}>
                       <ThemedText style={styles.exportOptionEmoji}>💸</ThemedText>
                     </View>
-                    <ThemedText style={styles.exportOptionTitle}>Chi tiêu</ThemedText>
-                    <ThemedText style={styles.exportOptionDesc}>Xuất tất cả giao dịch</ThemedText>
+                    <ThemedText style={{ ...styles.exportOptionTitle, color: text }}>Chi tiêu</ThemedText>
+                    <ThemedText style={{ ...styles.exportOptionDesc, color: subtleText }}>Xuất tất cả giao dịch</ThemedText>
                     {exportType === 'expense' && (
                       <View style={styles.exportCheckmark}>
                         <ThemedText style={styles.exportCheckmarkText}>✓</ThemedText>
@@ -881,15 +951,18 @@ export default function SettingsScreen() {
                       setShowExportModal(false);
                       setExportType(null);
                     }}
-                    style={({ pressed }) => [styles.exportCancelBtn, pressed && { opacity: 0.7 }]}
+                    style={({ pressed }) => [
+                      { ...styles.exportCancelBtn, backgroundColor: inputBg },
+                      pressed && { opacity: 0.7 }
+                    ]}
                   >
-                    <ThemedText style={styles.exportCancelBtnText}>Huỷ</ThemedText>
+                    <ThemedText style={{ ...styles.exportCancelBtnText, color: subtleText }}>Huỷ</ThemedText>
                   </Pressable>
                   <Pressable
                     onPress={exportTransactions}
                     disabled={!exportType || exportLoading}
                     style={({ pressed }) => [
-                      styles.exportDownloadBtn,
+                      { ...styles.exportDownloadBtn, backgroundColor: accentColor },
                       (!exportType || exportLoading) && styles.exportDownloadBtnDisabled,
                       pressed && { opacity: 0.7 }
                     ]}
@@ -916,10 +989,12 @@ function Section({
   title,
   danger,
   children,
+  borderColor,
 }: {
   title: string;
   danger?: boolean;
   children: React.ReactNode;
+  borderColor: string;
 }) {
   return (
     <View style={styles.section}>
@@ -927,7 +1002,7 @@ function Section({
         {title}
       </ThemedText>
 
-      <ThemedView style={styles.card}>{children}</ThemedView>
+      <ThemedView style={{ ...styles.card, borderColor }}>{children}</ThemedView>
     </View>
   );
 }
@@ -937,14 +1012,16 @@ function RowSwitch({
   subtitle,
   value,
   onValueChange,
+  borderColor,
 }: {
   title: string;
   subtitle?: string;
   value: boolean;
   onValueChange: (v: boolean) => void;
+  borderColor: string;
 }) {
   return (
-    <ThemedView style={styles.row}>
+    <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
       <View style={{ flex: 1 }}>
         <ThemedText style={styles.rowTitle}>{title}</ThemedText>
         {!!subtitle && <ThemedText style={styles.rowSub}>{subtitle}</ThemedText>}
@@ -958,14 +1035,16 @@ function RowPress({
   title,
   subtitle,
   onPress,
+  borderColor,
 }: {
   title: string;
   subtitle?: string;
   onPress: () => void;
+  borderColor: string;
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.75 }]}>
-      <ThemedView style={styles.row}>
+      <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
         <View style={{ flex: 1 }}>
           <ThemedText style={styles.rowTitle}>{title}</ThemedText>
           {!!subtitle && <ThemedText style={styles.rowSub}>{subtitle}</ThemedText>}
@@ -980,14 +1059,16 @@ function RowDanger({
   title,
   subtitle,
   onPress,
+  borderColor,
 }: {
   title: string;
   subtitle?: string;
   onPress: () => void;
+  borderColor: string;
 }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [pressed && { opacity: 0.75 }]}>
-      <ThemedView style={styles.row}>
+      <ThemedView style={{ ...styles.row, borderTopColor: borderColor }}>
         <View style={{ flex: 1 }}>
           <ThemedText style={[styles.rowTitle, { color: "#DC2626" }]}>{title}</ThemedText>
           {!!subtitle && <ThemedText style={[styles.rowSub, { color: "#DC2626" }]}>{subtitle}</ThemedText>}
@@ -1012,7 +1093,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
   avatarContainer: {
     position: 'relative',
@@ -1021,7 +1101,6 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(127,127,127,0.15)",
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1042,11 +1121,9 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
   },
   avatarBadgeText: {
     fontSize: 12,
@@ -1057,7 +1134,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.35)",
   },
   outlineBtnText: { fontWeight: "700" },
 
@@ -1069,7 +1145,6 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(127,127,127,0.25)",
   },
 
   row: {
@@ -1079,7 +1154,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "rgba(127,127,127,0.18)",
   },
 
   rowTitle: { fontSize: 14, fontWeight: "700" },
@@ -1121,17 +1195,12 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1.5,
-    borderColor: 'rgba(127,127,127,0.25)',
     borderRadius: 12,
     padding: 14,
     fontSize: 15,
-    backgroundColor: 'rgba(127,127,127,0.03)',
-    color: '#000',
   },
   inputDisabled: {
-    backgroundColor: 'rgba(127,127,127,0.12)',
-    color: 'rgba(0,0,0,0.4)',
-    borderColor: 'rgba(127,127,127,0.15)',
+    opacity: 0.5,
   },
   helperText: {
     fontSize: 11,
@@ -1148,7 +1217,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: 'rgba(127,127,127,0.15)',
     alignItems: 'center',
   },
   cancelBtnText: { 
@@ -1159,7 +1227,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 14,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
     alignItems: 'center',
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 2 },
@@ -1221,7 +1288,6 @@ const styles = StyleSheet.create({
   },
   exportOptionCard: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
@@ -1231,7 +1297,6 @@ const styles = StyleSheet.create({
   },
   exportOptionCardSelected: {
     borderColor: '#3B82F6',
-    backgroundColor: '#EFF6FF',
     shadowColor: '#3B82F6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
@@ -1295,13 +1360,11 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     borderRadius: 16,
-    backgroundColor: '#F3F4F6',
     alignItems: 'center',
   },
   exportCancelBtnText: {
     fontWeight: '700',
     fontSize: 16,
-    color: '#6B7280',
   },
   exportDownloadBtn: {
     flex: 1,

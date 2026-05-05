@@ -14,7 +14,7 @@ import {
 
 
 import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useAppColorScheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -79,13 +79,21 @@ const fmtMoney = (value: number) =>
 
 // ──────────────────────────────────────────────
 export default function AnalyticsScreen() {
-  const scheme = useColorScheme();
+  const scheme = useAppColorScheme();
   const theme = Colors[scheme ?? 'light'];
 
-  const bg = theme.background ?? '#fff';
-  const card = (theme as any).card ?? bg;
-  const text = theme.text ?? '#111';
-  const tint = theme.tint ?? '#2f6fed';
+  // Dùng màu giống trang index
+  const bg = scheme === 'dark' ? '#111827' : '#fff';
+  const card = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const text = scheme === 'dark' ? '#ECEDEE' : '#11181C';
+  const subtleText = scheme === 'dark' ? '#9ca3af' : '#64748b';
+  const borderColor = scheme === 'dark' ? '#374151' : '#e5e7eb';
+  
+  // Màu accent cho button - dùng màu xanh indigo
+  const accentColor = '#6366f1';
+  
+  // Màu cho input/button - tối hơn một chút so với card trong dark mode
+  const inputBg = scheme === 'dark' ? '#1f2937' : '#f9fafb';
 
   // Mặc định tháng/năm hiện tại
   const now = new Date();
@@ -391,7 +399,7 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: bg }}>
-        <ActivityIndicator size="large" color={tint} />
+        <ActivityIndicator size="large" color={accentColor} />
         <Text style={{ marginTop: 16, color: text }}>Đang tải dữ liệu...</Text>
       </View>
     );
@@ -420,7 +428,7 @@ export default function AnalyticsScreen() {
       </Text>
 
       {/* Chọn tháng & năm */}
-      <View style={{ backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: text + '22' }}>
+      <View style={{ backgroundColor: card, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: borderColor }}>
         <Text style={{ fontSize: 16, fontWeight: '700', color: text, marginBottom: 12 }}>
           Chọn thời gian
         </Text>
@@ -431,9 +439,9 @@ export default function AnalyticsScreen() {
               onPress={() => setShowMonthPicker(true)}
               style={{ 
                 borderWidth: 1, 
-                borderColor: tint, 
+                borderColor: accentColor, 
                 borderRadius: 12, 
-                backgroundColor: bg,
+                backgroundColor: inputBg,
                 padding: 14,
                 alignItems: 'center',
               }}
@@ -447,9 +455,9 @@ export default function AnalyticsScreen() {
               onPress={() => setShowYearPicker(true)}
               style={{ 
                 borderWidth: 1, 
-                borderColor: tint, 
+                borderColor: accentColor, 
                 borderRadius: 12, 
-                backgroundColor: bg,
+                backgroundColor: inputBg,
                 padding: 14,
                 alignItems: 'center',
               }}
@@ -482,7 +490,7 @@ export default function AnalyticsScreen() {
                     width: '30%',
                     padding: 12,
                     borderRadius: 12,
-                    backgroundColor: selectedMonth === m ? tint : bg,
+                    backgroundColor: selectedMonth === m ? accentColor : inputBg,
                     alignItems: 'center',
                   }}
                 >
@@ -518,7 +526,7 @@ export default function AnalyticsScreen() {
                     style={{
                       padding: 14,
                       borderRadius: 12,
-                      backgroundColor: selectedYear === y ? tint : bg,
+                      backgroundColor: selectedYear === y ? accentColor : inputBg,
                       alignItems: 'center',
                     }}
                   >
@@ -535,26 +543,26 @@ export default function AnalyticsScreen() {
 
       {/* Cards */}
       <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor }}>
           <Text style={{ color: text + 'AA' }}>Thu nhập</Text>
-          <Text style={{ fontSize: 22, fontWeight: '900', color: tint }}>{fmtMoney(income)}</Text>
+          <Text style={{ fontSize: 22, fontWeight: '900', color: accentColor }}>{fmtMoney(income)}</Text>
         </View>
-        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+        <View style={{ flex: 1, padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor }}>
           <Text style={{ color: text + 'AA' }}>Chi tiêu</Text>
           <Text style={{ fontSize: 22, fontWeight: '900', color: '#ef4444' }}>{fmtMoney(expense)}</Text>
         </View>
       </View>
 
-      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor, marginBottom: 24 }}>
         <Text style={{ color: text + 'AA' }}>Số dư</Text>
-        <Text style={{ fontSize: 26, fontWeight: '900', color: balance >= 0 ? tint : '#ef4444' }}>
+        <Text style={{ fontSize: 26, fontWeight: '900', color: balance >= 0 ? accentColor : '#ef4444' }}>
           {fmtMoney(balance)}
         </Text>
       </View>
 
       {/* So sánh thu/chi các tháng */}
       {monthlyComparison.length > 0 && (
-        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor, marginBottom: 24 }}>
           <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
             So sánh thu/chi giữa các tháng
           </Text>
@@ -585,7 +593,7 @@ export default function AnalyticsScreen() {
               <VictoryBar
                 data={monthlyComparison.map(m => ({ x: m.month, y: m.income }))}
                 cornerRadius={{ top: 3 }}
-                style={{ data: { fill: tint } }}
+                style={{ data: { fill: accentColor } }}
                 barWidth={12}
               />
               <VictoryBar
@@ -599,7 +607,7 @@ export default function AnalyticsScreen() {
 
           <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: tint }} />
+              <View style={{ width: 14, height: 14, borderRadius: 4, backgroundColor: accentColor }} />
               <Text style={{ color: text + 'CC' }}>Thu nhập</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -612,7 +620,7 @@ export default function AnalyticsScreen() {
 
       {/* Pie chi tiêu */}
       {expense > 0 && expensePieData.length > 0 && (
-        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 24 }}>
+        <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor, marginBottom: 24 }}>
           <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
             Phân bổ chi tiêu theo danh mục
           </Text>
@@ -658,7 +666,7 @@ export default function AnalyticsScreen() {
       )}
 
       {/* Bộ lọc */}
-      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22', marginBottom: 16 }}>
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor, marginBottom: 16 }}>
         <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
           Lọc giao dịch
         </Text>
@@ -673,8 +681,8 @@ export default function AnalyticsScreen() {
                 paddingHorizontal: 16,
                 borderRadius: 999,
                 borderWidth: 1.5,
-                borderColor: filterType === type ? tint : text + '44',
-                backgroundColor: filterType === type ? tint : 'transparent',
+                borderColor: filterType === type ? accentColor : borderColor,
+                backgroundColor: filterType === type ? accentColor : 'transparent',
               }}
             >
               <Text style={{ fontWeight: '700', color: filterType === type ? '#fff' : text }}>
@@ -692,8 +700,8 @@ export default function AnalyticsScreen() {
               paddingHorizontal: 16,
               borderRadius: 999,
               borderWidth: 1.5,
-              borderColor: selectedCategoryId === null ? tint : text + '44',
-              backgroundColor: selectedCategoryId === null ? tint : 'transparent',
+              borderColor: selectedCategoryId === null ? accentColor : borderColor,
+              backgroundColor: selectedCategoryId === null ? accentColor : 'transparent',
             }}
           >
             <Text style={{ fontWeight: '700', color: selectedCategoryId === null ? '#fff' : text }}>
@@ -710,8 +718,8 @@ export default function AnalyticsScreen() {
                 paddingHorizontal: 16,
                 borderRadius: 999,
                 borderWidth: 1.5,
-                borderColor: selectedCategoryId === cat.id ? tint : text + '44',
-                backgroundColor: selectedCategoryId === cat.id ? tint : 'transparent',
+                borderColor: selectedCategoryId === cat.id ? accentColor : borderColor,
+                backgroundColor: selectedCategoryId === cat.id ? accentColor : 'transparent',
               }}
             >
               <Text style={{ fontWeight: '700', color: selectedCategoryId === cat.id ? '#fff' : text }}>
@@ -723,7 +731,7 @@ export default function AnalyticsScreen() {
       </View>
 
       {/* Danh sách giao dịch - hiển thị ảnh icon_uri + emoji fallback */}
-      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: text + '22' }}>
+      <View style={{ padding: 16, borderRadius: 16, backgroundColor: card, borderWidth: 1, borderColor: borderColor }}>
         <Text style={{ fontSize: 18, fontWeight: '900', color: text, marginBottom: 12 }}>
           Giao dịch tháng {selectedMonth}/{selectedYear} ({filteredTransactions.length})
         </Text>
@@ -742,10 +750,10 @@ export default function AnalyticsScreen() {
                   flexDirection: 'row',
                   padding: 12,
                   borderRadius: 12,
-                  backgroundColor: bg,
+                  backgroundColor: inputBg,
                   marginBottom: 8,
                   borderWidth: 1,
-                  borderColor: text + '11',
+                  borderColor: borderColor,
                 }}
               >
                 <View style={{ width: 40, height: 40, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
@@ -771,7 +779,7 @@ export default function AnalyticsScreen() {
                       style={{
                         fontSize: 17,
                         fontWeight: '900',
-                        color: tx.type === 'income' ? tint : '#ef4444',
+                        color: tx.type === 'income' ? accentColor : '#ef4444',
                       }}
                     >
                       {tx.type === 'income' ? '+' : '-'} {fmtMoney(Number(tx.amount))}

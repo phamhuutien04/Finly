@@ -4,10 +4,10 @@ import React from "react";
 
 import { HapticTab } from "@/components/haptic-tab";
 import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  const colorScheme = useAppColorScheme();
   const tint = Colors[colorScheme ?? "light"].tint;
 
   return (

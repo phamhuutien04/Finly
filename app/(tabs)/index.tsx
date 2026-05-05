@@ -16,6 +16,8 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { Colors } from "@/constants/theme";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { useBudgetAlert } from "@/hooks/useBudgetAlert";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useSepayAutoSync } from "@/hooks/useSepayAutoSync";
@@ -99,6 +101,17 @@ function formatTimeLabel(iso: string) {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const scheme = useAppColorScheme();
+  const theme = Colors[scheme ?? 'light'];
+  
+  // Improved colors with better contrast
+  const bg = theme.background ?? '#fff';
+  const text = scheme === 'dark' ? '#f9fafb' : '#1f2937';
+  const cardBg = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const borderColor = scheme === 'dark' ? '#374151' : '#d1d5db';
+  const subtleText = scheme === 'dark' ? '#9ca3af' : '#64748b';
+  const screenBg = scheme === 'dark' ? '#111827' : '#f5f5f5';
+  
   const { showAlert, AlertComponent } = useBudgetAlert();
   const { unreadCount } = useNotifications();
   
@@ -433,7 +446,7 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={[styles.screen, { backgroundColor: '#fafafa' }]}>
+    <View style={{ flex: 1, backgroundColor: screenBg }}>
       <FlatList
         data={txs}
         keyExtractor={(item: TransactionUI) => item.id}
@@ -451,9 +464,9 @@ export default function HomeScreen() {
             {/* Header */}
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.greeting}>Xin chào! 👋</ThemedText>
+                <ThemedText style={[styles.greeting, { color: text }]}>Xin chào! 👋</ThemedText>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <ThemedText style={styles.subtitle}>{monthLabel}</ThemedText>
+                  <ThemedText style={[styles.subtitle, { color: subtleText }]}>{monthLabel}</ThemedText>
                 </View>
               </View>
 
@@ -461,12 +474,14 @@ export default function HomeScreen() {
                 {/* Notification Button */}
                 <Link href="/tab/notifications" asChild>
                   <Pressable 
-                    style={({ pressed }: { pressed: boolean }) => [
-                      styles.notificationButton,
-                      pressed && { opacity: 0.7 }
-                    ]}
+                    style={({ pressed }: { pressed: boolean }) => ({
+                      ...styles.notificationButton,
+                      backgroundColor: cardBg,
+                      borderColor: borderColor,
+                      opacity: pressed ? 0.7 : 1
+                    })}
                   >
-                    <Ionicons name="notifications-outline" size={24} color="#374151" />
+                    <Ionicons name="notifications-outline" size={24} color={text} />
                     {/* Badge for unread notifications - only show if count > 0 */}
                     {unreadCount > 0 && (
                       <View style={styles.notificationBadge}>
@@ -481,23 +496,26 @@ export default function HomeScreen() {
                 {/* Add Transaction Button */}
                 <Link href="/tab/modal" asChild>
                   <Pressable 
-                    style={({ pressed }: { pressed: boolean }) => [
-                      styles.addButton,
-                      pressed && { opacity: 0.85, transform: [{ scale: 0.96 }] }
-                    ]}
+                    style={({ pressed }: { pressed: boolean }) => ({
+                      ...styles.addButton,
+                      backgroundColor: cardBg,
+                      borderColor: borderColor,
+                      opacity: pressed ? 0.85 : 1,
+                      transform: pressed ? [{ scale: 0.96 }] : [{ scale: 1 }]
+                    })}
                   >
-                    <Ionicons name="add" size={28} color="#000" />
+                    <Ionicons name="add" size={28} color={text} />
                   </Pressable>
                 </Link>
               </View>
             </View>
 
             {/* Hero Balance Card */}
-            <View style={styles.heroCard}>
+            <View style={{ ...styles.heroCard, backgroundColor: cardBg, borderColor: borderColor }}>
               <View style={styles.heroContent}>
-                <ThemedText style={styles.heroLabel}>Tổng tài sản</ThemedText>
-                <View style={styles.amountContainer}>
-                  <Text style={styles.heroAmount}>{formatVND(balance)}</Text>
+                <ThemedText style={[styles.heroLabel, { color: subtleText }]}>Tổng tài sản</ThemedText>
+                <View style={{ ...styles.amountContainer, backgroundColor: cardBg, borderColor: borderColor }}>
+                  <Text style={[styles.heroAmount, { color: text }]}>{formatVND(balance)}</Text>
                 </View>
                 
                 <View style={styles.statsRow}>
@@ -506,20 +524,20 @@ export default function HomeScreen() {
                       <ThemedText style={styles.statIcon}>↗</ThemedText>
                     </View>
                     <View>
-                      <ThemedText style={styles.statLabel}>Thu nhập</ThemedText>
-                      <ThemedText style={styles.statValue}>{formatVND(income)}</ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: subtleText }]}>Thu nhập</ThemedText>
+                      <ThemedText style={[styles.statValue, { color: text }]}>{formatVND(income)}</ThemedText>
                     </View>
                   </View>
 
-                  <View style={styles.statDivider} />
+                  <View style={{ ...styles.statDivider, backgroundColor: borderColor }} />
 
                   <View style={styles.statItem}>
                     <View style={[styles.statIconContainer, { backgroundColor: 'rgba(239, 68, 68, 0.15)' }]}>
                       <ThemedText style={styles.statIcon}>↘</ThemedText>
                     </View>
                     <View>
-                      <ThemedText style={styles.statLabel}>Chi tiêu</ThemedText>
-                      <ThemedText style={styles.statValue}>{formatVND(expense)}</ThemedText>
+                      <ThemedText style={[styles.statLabel, { color: subtleText }]}>Chi tiêu</ThemedText>
+                      <ThemedText style={[styles.statValue, { color: text }]}>{formatVND(expense)}</ThemedText>
                     </View>
                   </View>
                 </View>
@@ -536,26 +554,32 @@ export default function HomeScreen() {
                 label="Quét hóa đơn" 
                 href="/scan-receipt"
                 gradient={['#10b981', '#059669']}
+                cardBg={cardBg}
+                borderColor={borderColor}
+                textColor={text}
               />
               <QuickAction 
                 icon="🎯" 
                 label="Ngân sách" 
                 href="/tab/listbudgets"
                 gradient={['#8b5cf6', '#7c3aed']}
+                cardBg={cardBg}
+                borderColor={borderColor}
+                textColor={text}
               />
             </View>
 
             {/* Transactions Header */}
             <View style={styles.txHeader}>
               <View>
-                <ThemedText style={styles.txTitle}>Giao dịch</ThemedText>
-                <ThemedText style={styles.txSubtitle}>
+                <ThemedText style={[styles.txTitle, { color: text }]}>Giao dịch</ThemedText>
+                <ThemedText style={[styles.txSubtitle, { color: subtleText }]}>
                   {txs.length} giao dịch gần đây
                 </ThemedText>
               </View>
               
               <Link href="/tab/transactions" asChild>
-                <Pressable style={styles.viewAllBtn}>
+                <Pressable style={{ ...styles.viewAllBtn, backgroundColor: scheme === 'dark' ? '#1f2937' : '#f8fafc' }}>
                   <ThemedText style={styles.viewAllText}>Tất cả</ThemedText>
                   <ThemedText style={styles.viewAllArrow}>→</ThemedText>
                 </Pressable>
@@ -570,11 +594,11 @@ export default function HomeScreen() {
             </View>
           ) : (
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
+              <View style={{ ...styles.emptyIconContainer, backgroundColor: scheme === 'dark' ? '#1f2937' : '#f1f5f9', borderColor: borderColor }}>
                 <ThemedText style={styles.emptyIcon}>💳</ThemedText>
               </View>
-              <ThemedText style={styles.emptyTitle}>Chưa có giao dịch</ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Chưa có giao dịch</ThemedText>
+              <ThemedText style={[styles.emptyDescription, { color: subtleText }]}>
                 Bắt đầu ghi chép thu chi của bạn ngay hôm nay
               </ThemedText>
               <Link href="/tab/modal" asChild>
@@ -586,7 +610,7 @@ export default function HomeScreen() {
           )
         }
         renderItem={({ item, index }: { item: TransactionUI; index: number }) => (
-          <TransactionCard tx={item} index={index} />
+          <TransactionCard tx={item} index={index} cardBg={cardBg} borderColor={borderColor} textColor={text} subtleText={subtleText} />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
       />
@@ -601,20 +625,29 @@ function QuickAction({
   icon, 
   label, 
   href,
-  gradient 
+  gradient,
+  cardBg,
+  borderColor,
+  textColor
 }: { 
   icon: string; 
   label: string; 
   href: string;
   gradient: string[];
+  cardBg: string;
+  borderColor: string;
+  textColor: string;
 }) {
   return (
     <Link href={href as any} asChild>
       <Pressable 
-        style={({ pressed }: { pressed: boolean }) => [
-          styles.actionCard,
-          pressed && { opacity: 0.9, transform: [{ scale: 0.95 }] }
-        ]}
+        style={({ pressed }: { pressed: boolean }) => ({
+          ...styles.actionCard,
+          backgroundColor: cardBg,
+          borderColor: borderColor,
+          opacity: pressed ? 0.9 : 1,
+          transform: pressed ? [{ scale: 0.95 }] : [{ scale: 1 }]
+        })}
       >
         <View 
           style={[
@@ -624,21 +657,31 @@ function QuickAction({
         >
           <ThemedText style={styles.actionIcon}>{icon}</ThemedText>
         </View>
-        <ThemedText style={styles.actionLabel}>{label}</ThemedText>
+        <ThemedText style={[styles.actionLabel, { color: textColor }]}>{label}</ThemedText>
       </Pressable>
     </Link>
   );
 }
 
-function TransactionCard({ tx, index }: { tx: TransactionUI; index: number }) {
+function TransactionCard({ tx, index, cardBg, borderColor, textColor, subtleText }: { 
+  tx: TransactionUI; 
+  index: number;
+  cardBg: string;
+  borderColor: string;
+  textColor: string;
+  subtleText: string;
+}) {
   const isIncome = tx.type === "income";
   
   return (
     <Pressable 
-      style={({ pressed }: { pressed: boolean }) => [
-        styles.txCard,
-        pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }
-      ]}
+      style={({ pressed }: { pressed: boolean }) => ({
+        ...styles.txCard,
+        backgroundColor: cardBg,
+        borderColor: borderColor,
+        opacity: pressed ? 0.8 : 1,
+        transform: pressed ? [{ scale: 0.98 }] : [{ scale: 1 }]
+      })}
     >
       {/* Color indicator */}
       <View 
@@ -648,7 +691,7 @@ function TransactionCard({ tx, index }: { tx: TransactionUI; index: number }) {
         ]} 
       />
       
-      <View style={styles.txIconWrapper}>
+      <View style={{ ...styles.txIconWrapper, backgroundColor: borderColor + '40', borderColor: borderColor }}>
         {tx.iconUri ? (
           <Image 
             source={{ uri: tx.iconUri }} 
@@ -662,8 +705,8 @@ function TransactionCard({ tx, index }: { tx: TransactionUI; index: number }) {
       </View>
 
       <View style={{ flex: 1 }}>
-        <ThemedText style={styles.txCardTitle}>{tx.title}</ThemedText>
-        <ThemedText style={styles.txCardMeta}>
+        <ThemedText style={[styles.txCardTitle, { color: textColor }]}>{tx.title}</ThemedText>
+        <ThemedText style={[styles.txCardMeta, { color: subtleText }]}>
           {tx.category} • {tx.time}
         </ThemedText>
       </View>
@@ -693,7 +736,6 @@ function TransactionCard({ tx, index }: { tx: TransactionUI; index: number }) {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#fafafa',
   },
   
   scrollContent: {
@@ -713,11 +755,9 @@ const styles = StyleSheet.create({
     fontSize: isSmallScreen ? 26 : isMediumScreen ? 30 : 32,
     fontWeight: '900',
     letterSpacing: -1.2,
-    color: '#0f172a',
   },
   subtitle: {
     fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
-    color: '#64748b',
     marginTop: 4,
     fontWeight: '600',
   },
@@ -731,7 +771,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -739,6 +778,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    borderWidth: 1,
   },
   notificationBadge: {
     position: 'absolute',
@@ -763,7 +803,6 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 48 : isMediumScreen ? 52 : 56,
     height: isSmallScreen ? 48 : isMediumScreen ? 52 : 56,
     borderRadius: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
-    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -772,12 +811,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
   },
 
   // Hero Card - Responsive
   heroCard: {
-    backgroundColor: '#ffffff',
     borderRadius: isSmallScreen ? 20 : isMediumScreen ? 24 : 28,
     padding: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     marginBottom: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
@@ -788,7 +825,6 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 8,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
     width: '100%',
     alignSelf: 'stretch',
   },
@@ -796,12 +832,10 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   amountContainer: {
-    backgroundColor: '#ffffff',
     padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
     width: '100%',
     minHeight: isSmallScreen ? 60 : isMediumScreen ? 70 : 80,
     justifyContent: 'center',
@@ -809,7 +843,6 @@ const styles = StyleSheet.create({
   },
   heroLabel: {
     fontSize: isSmallScreen ? 12 : isMediumScreen ? 13 : 14,
-    color: '#64748b',
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1.5,
@@ -818,7 +851,6 @@ const styles = StyleSheet.create({
   heroAmount: {
     fontSize: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
     fontWeight: '900',
-    color: '#000000',
     letterSpacing: -1,
     textAlign: 'center',
     backgroundColor: 'transparent',
@@ -854,21 +886,18 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: isSmallScreen ? 11 : isMediumScreen ? 12 : 12,
-    color: '#94a3b8',
     fontWeight: '600',
     marginBottom: 2,
   },
   statValue: {
     fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     fontWeight: '800',
-    color: '#000000',
     letterSpacing: -0.5,
     backgroundColor: 'transparent',
   },
   statDivider: {
     width: isSmallScreen ? '100%' : 1,
     height: isSmallScreen ? 1 : 40,
-    backgroundColor: '#e2e8f0',
     marginHorizontal: isSmallScreen ? 0 : 12,
     marginVertical: isSmallScreen ? 8 : 0,
   },
@@ -880,7 +909,6 @@ const styles = StyleSheet.create({
     marginBottom: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
   },
   actionCard: {
-    backgroundColor: '#ffffff',
     borderRadius: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     paddingVertical: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     paddingHorizontal: isSmallScreen ? 32 : isMediumScreen ? 36 : 40,
@@ -891,7 +919,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
     minWidth: isSmallScreen ? 120 : isMediumScreen ? 140 : 160,
   },
   actionIconBg: {
@@ -908,7 +935,6 @@ const styles = StyleSheet.create({
   actionLabel: {
     fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
     fontWeight: '800',
-    color: '#0f172a',
     letterSpacing: -0.2,
     textAlign: 'center',
   },
@@ -923,12 +949,10 @@ const styles = StyleSheet.create({
   txTitle: {
     fontSize: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
     fontWeight: '900',
-    color: '#0f172a',
     letterSpacing: -0.8,
   },
   txSubtitle: {
     fontSize: isSmallScreen ? 12 : isMediumScreen ? 12 : 13,
-    color: '#94a3b8',
     marginTop: 2,
     fontWeight: '600',
   },
@@ -939,7 +963,6 @@ const styles = StyleSheet.create({
     paddingVertical: isSmallScreen ? 6 : isMediumScreen ? 7 : 8,
     paddingHorizontal: isSmallScreen ? 10 : isMediumScreen ? 11 : 12,
     borderRadius: 12,
-    backgroundColor: '#f8fafc',
   },
   viewAllText: {
     fontSize: isSmallScreen ? 13 : isMediumScreen ? 13 : 14,
@@ -957,7 +980,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: isSmallScreen ? 10 : isMediumScreen ? 12 : 14,
-    backgroundColor: '#ffffff',
     borderRadius: isSmallScreen ? 16 : isMediumScreen ? 18 : 20,
     padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     shadowColor: '#000',
@@ -966,7 +988,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.03)',
     overflow: 'hidden',
   },
   txIndicator: {
@@ -980,11 +1001,9 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
     height: isSmallScreen ? 44 : isMediumScreen ? 48 : 52,
     borderRadius: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
-    backgroundColor: '#f8fafc',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
   txIconImage: {
     width: isSmallScreen ? 24 : isMediumScreen ? 28 : 32,
@@ -997,13 +1016,11 @@ const styles = StyleSheet.create({
   txCardTitle: {
     fontSize: isSmallScreen ? 14 : isMediumScreen ? 15 : 16,
     fontWeight: '800',
-    color: '#0f172a',
     marginBottom: 4,
     letterSpacing: -0.3,
   },
   txCardMeta: {
     fontSize: isSmallScreen ? 12 : isMediumScreen ? 12 : 13,
-    color: '#94a3b8',
     fontWeight: '600',
   },
   txAmountContainer: {
@@ -1035,12 +1052,10 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 80 : isMediumScreen ? 90 : 100,
     height: isSmallScreen ? 80 : isMediumScreen ? 90 : 100,
     borderRadius: isSmallScreen ? 40 : isMediumScreen ? 45 : 50,
-    backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isSmallScreen ? 20 : isMediumScreen ? 22 : 24,
     borderWidth: 3,
-    borderColor: '#e2e8f0',
   },
   emptyIcon: {
     fontSize: isSmallScreen ? 36 : isMediumScreen ? 42 : 48,
@@ -1048,14 +1063,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: isSmallScreen ? 18 : isMediumScreen ? 20 : 22,
     fontWeight: '900',
-    color: '#0f172a',
     marginBottom: 8,
     letterSpacing: -0.5,
     textAlign: 'center',
   },
   emptyDescription: {
     fontSize: isSmallScreen ? 14 : isMediumScreen ? 14 : 15,
-    color: '#94a3b8',
     textAlign: 'center',
     lineHeight: isSmallScreen ? 20 : isMediumScreen ? 21 : 22,
     marginBottom: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,

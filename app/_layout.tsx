@@ -6,7 +6,7 @@ import { LogBox } from 'react-native';
 import 'react-native-reanimated';
 
 import GlobalAlertProvider from '@/components/GlobalAlertProvider';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ThemeProvider as AppThemeProvider, useAppColorScheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/lib/supabase';
 
 // Tắt tất cả warnings và errors trên màn hình
@@ -102,7 +102,15 @@ async function ensureSeedCategories(userId: string) {
 }
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  return (
+    <AppThemeProvider>
+      <RootLayoutContent />
+    </AppThemeProvider>
+  );
+}
+
+function RootLayoutContent() {
+  const colorScheme = useAppColorScheme();
   const router = useRouter();
   const segments = useSegments();
   const [isReady, setIsReady] = useState(false);

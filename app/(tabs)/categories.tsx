@@ -17,6 +17,8 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { Colors } from "@/constants/theme";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 
 const { width } = Dimensions.get("window");
@@ -43,6 +45,18 @@ const formatVND = (n: number) =>
   new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
 
 export default function CategoriesScreen() {
+  const scheme = useAppColorScheme();
+  const theme = Colors[scheme ?? 'light'];
+  
+  // Improved light/dark theme with better contrast
+  const screenBg = scheme === 'dark' ? '#111827' : '#f5f5f5';
+  const cardBg = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const text = scheme === 'dark' ? '#f9fafb' : '#1f2937';  // Darker text for light mode
+  const subtleText = scheme === 'dark' ? '#9ca3af' : '#64748b';  // Better contrast
+  const borderColor = scheme === 'dark' ? '#374151' : '#d1d5db';  // More visible border
+  const inputBg = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const accentColor = '#6366f1';
+  
   const [activeType, setActiveType] = useState<CategoryType>("expense");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -414,7 +428,7 @@ export default function CategoriesScreen() {
   };
 
   return (
-    <ThemedView style={styles.screen}>
+    <ThemedView style={[styles.screen, { backgroundColor: screenBg }]}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => String(item.id)}
@@ -426,22 +440,23 @@ export default function CategoriesScreen() {
           <>
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
-                <ThemedText style={styles.title}>Danh mục</ThemedText>
-                <ThemedText style={styles.subtitle}>Quản lý danh mục thu chi</ThemedText>
+                <ThemedText style={{ ...styles.title, color: text }}>Danh mục</ThemedText>
+                <ThemedText style={{ ...styles.subtitle, color: subtleText }}>Quản lý danh mục thu chi</ThemedText>
               </View>
 
               <Pressable
                 onPress={openCreate}
-                style={({ pressed }) => [
-                  styles.addButton,
-                  pressed && { opacity: 0.8 },
-                ]}
+                style={({ pressed }) => ({
+                  ...styles.addButton,
+                  backgroundColor: accentColor,
+                  opacity: pressed ? 0.8 : 1
+                })}
               >
                 <ThemedText style={styles.addButtonText}>+</ThemedText>
               </Pressable>
             </View>
 
-            <View style={styles.statsCard}>
+            <View style={{ ...styles.statsCard, backgroundColor: cardBg, borderColor: borderColor }}>
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
                   <ThemedText style={styles.statLabel}>Thu nhập</ThemedText>
@@ -464,7 +479,7 @@ export default function CategoriesScreen() {
             <View style={styles.quickFilters}>
               <Pressable
                 onPress={setFilterToday}
-                style={[styles.filterChip, filterMode === "today" && styles.filterChipActive]}
+                style={{ ...styles.filterChip, ...(filterMode === "today" && { backgroundColor: accentColor, borderColor: accentColor }) }}
               >
                 <ThemedText
                   style={[styles.filterChipText, filterMode === "today" && styles.filterChipTextActive]}
@@ -475,7 +490,7 @@ export default function CategoriesScreen() {
 
               <Pressable
                 onPress={setFilterThisMonth}
-                style={[styles.filterChip, filterMode === "month" && styles.filterChipActive]}
+                style={{ ...styles.filterChip, ...(filterMode === "month" && { backgroundColor: accentColor, borderColor: accentColor }) }}
               >
                 <ThemedText
                   style={[styles.filterChipText, filterMode === "month" && styles.filterChipTextActive]}
@@ -486,7 +501,7 @@ export default function CategoriesScreen() {
 
               <Pressable
                 onPress={setFilterThisYear}
-                style={[styles.filterChip, filterMode === "year" && styles.filterChipActive]}
+                style={{ ...styles.filterChip, ...(filterMode === "year" && { backgroundColor: accentColor, borderColor: accentColor }) }}
               >
                 <ThemedText
                   style={[styles.filterChipText, filterMode === "year" && styles.filterChipTextActive]}
@@ -520,14 +535,14 @@ export default function CategoriesScreen() {
               </View>
             )}
 
-            <View style={styles.searchContainer}>
+            <View style={{ ...styles.searchContainer, backgroundColor: inputBg, borderColor: borderColor }}>
               <ThemedText style={styles.searchIcon}>🔍</ThemedText>
               <TextInput
                 value={q}
                 onChangeText={setQ}
                 placeholder="Tìm danh mục..."
-                placeholderTextColor="#9ca3af"
-                style={styles.searchInput}
+                placeholderTextColor={subtleText}
+                style={{ ...styles.searchInput, color: text }}
               />
             </View>
 
@@ -536,7 +551,7 @@ export default function CategoriesScreen() {
             </ThemedText>
           </>
         }
-        renderItem={({ item }) => <CategoryCard item={item} onEdit={openEdit} />}
+        renderItem={({ item }) => <CategoryCard item={item} onEdit={openEdit} cardBg={cardBg} borderColor={borderColor} />}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         ListEmptyComponent={
           loading ? (
@@ -588,23 +603,23 @@ export default function CategoriesScreen() {
               </View>
             )}
 
-            <View style={styles.inputContainer}>
+            <View style={{ ...styles.inputContainer, backgroundColor: inputBg, borderColor: borderColor }}>
               <TextInput
                 value={name}
                 onChangeText={setName}
                 placeholder="Tên danh mục"
-                placeholderTextColor="#9ca3af"
-                style={styles.modalInput}
+                placeholderTextColor={subtleText}
+                style={{ ...styles.modalInput, color: text }}
               />
             </View>
 
-            <View style={styles.inputContainer}>
+            <View style={{ ...styles.inputContainer, backgroundColor: inputBg, borderColor: borderColor }}>
               <TextInput
                 value={emoji}
                 onChangeText={setEmoji}
                 placeholder="Emoji (tùy chọn)"
-                placeholderTextColor="#9ca3af"
-                style={styles.modalInput}
+                placeholderTextColor={subtleText}
+                style={{ ...styles.modalInput, color: text }}
               />
             </View>
 
@@ -660,7 +675,7 @@ export default function CategoriesScreen() {
 
               <Pressable
                 onPress={onSave}
-                style={[styles.modalBtnSave, saving && { opacity: 0.7 }]}
+                style={{ ...styles.modalBtnSave, backgroundColor: accentColor, opacity: saving ? 0.7 : 1 }}
                 disabled={saving}
               >
                 {saving ? (
@@ -677,7 +692,12 @@ export default function CategoriesScreen() {
   );
 }
 
-function CategoryCard({ item, onEdit }: { item: CategoryRow; onEdit: (c: CategoryRow) => void }) {
+function CategoryCard({ item, onEdit, cardBg, borderColor }: { 
+  item: CategoryRow; 
+  onEdit: (c: CategoryRow) => void;
+  cardBg: string;
+  borderColor: string;
+}) {
   const isIncome = normalizeType(item.type) === "income";
 
   // Đảm bảo amount luôn là số hợp lệ, tránh NaN/undefined/null
@@ -694,10 +714,12 @@ function CategoryCard({ item, onEdit }: { item: CategoryRow; onEdit: (c: Categor
   return (
     <Pressable
       onPress={() => onEdit(item)}
-      style={({ pressed }) => [
-        styles.categoryCard,
-        pressed && { opacity: 0.85 },
-      ]}
+      style={({ pressed }) => ({
+        ...styles.categoryCard,
+        backgroundColor: cardBg,
+        borderColor: borderColor,
+        opacity: pressed ? 0.85 : 1
+      })}
     >
       <View style={styles.categoryContent}>
         {/* Icon hoặc Emoji */}
@@ -770,7 +792,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: "#3b82f6",
     alignItems: "center",
     justifyContent: "center",
     elevation: 3,
@@ -786,12 +807,10 @@ const styles = StyleSheet.create({
   },
 
   statsCard: {
-    backgroundColor: "rgba(0,0,0,0.04)",
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.1)",
+    borderWidth: 1,
   },
   statsRow: {
     flexDirection: "row",
@@ -828,14 +847,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderWidth: 1,
+    borderColor: 'transparent',
     alignItems: "center",
-  },
-  filterChipActive: {
-    backgroundColor: "#3b82f6",
-    borderColor: "#3b82f6",
   },
   filterChipText: {
     fontSize: 13,
@@ -875,12 +889,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.06)",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderWidth: 1,
     marginBottom: 16,
   },
   searchIcon: {
@@ -891,7 +903,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: "#000",
   },
 
   sectionTitle: {
@@ -908,9 +919,7 @@ const styles = StyleSheet.create({
   categoryCard: {
     flex: 1,
     borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.04)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.1)",
+    borderWidth: 1,
     overflow: "hidden",
   },
   categoryContent: {
@@ -1029,9 +1038,7 @@ const styles = StyleSheet.create({
   modalInput: {
     padding: 14,
     borderRadius: 12,
-    backgroundColor: "rgba(0,0,0,0.06)",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,0,0,0.12)",
+    borderWidth: 1,
     fontSize: 16,
   },
 
@@ -1127,7 +1134,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    backgroundColor: "#3b82f6",
     alignItems: "center",
   },
   modalBtnSaveText: {

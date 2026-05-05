@@ -2,21 +2,22 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  Image,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    Dimensions,
+    FlatList,
+    Image,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { useAppColorScheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/lib/supabase";
 
 const { width: screenWidth } = Dimensions.get("window");
@@ -48,6 +49,16 @@ type Friendship = {
 type ListItem = Friendship | UserProfile;
 
 export default function SocialScreen() {
+  const scheme = useAppColorScheme();
+  
+  // Improved light/dark theme with better contrast
+  const screenBg = scheme === 'dark' ? '#111827' : '#f5f5f5';
+  const cardBg = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const text = scheme === 'dark' ? '#f9fafb' : '#1f2937';
+  const subtleText = scheme === 'dark' ? '#9ca3af' : '#64748b';
+  const borderColor = scheme === 'dark' ? '#374151' : '#d1d5db';
+  const inputBg = scheme === 'dark' ? '#1f2937' : '#ffffff';
+  const accentColor = '#6366f1';
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>("friends");
   const [loading, setLoading] = useState(true);
@@ -487,38 +498,49 @@ export default function SocialScreen() {
 
     return (
       <Pressable 
-        style={styles.friendCard}
+        style={({ pressed }) => ({
+          ...styles.friendCard,
+          backgroundColor: cardBg,
+          borderColor: borderColor,
+          opacity: pressed ? 0.7 : 1
+        })}
         onPress={() => router.push(`/profile/${profile.user_id}` as any)}
       >
         <View style={styles.avatarContainer}>
           {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+            <Image source={{ uri: profile.avatar_url }} style={{ ...styles.avatar, borderColor: cardBg }} />
           ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={32} color="#9ca3af" />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: inputBg, borderColor: cardBg }]}>
+              <Ionicons name="person" size={32} color={subtleText} />
             </View>
           )}
         </View>
 
         <View style={styles.friendInfo}>
-          <ThemedText style={styles.friendName}>
+          <ThemedText style={{ ...styles.friendName, color: text }}>
             {displayName}
           </ThemedText>
           {subtitle && (
-            <ThemedText style={styles.friendBio} numberOfLines={2}>
+            <ThemedText style={{ ...styles.friendBio, color: subtleText }} numberOfLines={2}>
               {subtitle}
             </ThemedText>
           )}
         </View>
 
         <Pressable 
-          style={styles.messageButton}
+          style={({ pressed }) => ({
+            ...styles.messageButton,
+            backgroundColor: inputBg,
+            opacity: pressed ? 0.7 : 1,
+            padding: 8,
+            borderRadius: 8
+          })}
           onPress={(e) => {
             e.stopPropagation();
             router.push(`/chat/${profile.user_id}` as any);
           }}
         >
-          <Ionicons name="chatbubble-outline" size={20} color="#6366f1" />
+          <Ionicons name="chatbubble-outline" size={20} color={accentColor} />
         </Pressable>
       </Pressable>
     );
@@ -531,43 +553,51 @@ export default function SocialScreen() {
     const displayName = profile.display_name || "Chưa đặt tên";
 
     return (
-      <View style={styles.requestCard}>
+      <View style={{ ...styles.requestCard, backgroundColor: cardBg, borderColor: '#f59e0b' }}>
         <View style={styles.avatarContainer}>
           {profile.avatar_url ? (
-            <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+            <Image source={{ uri: profile.avatar_url }} style={{ ...styles.avatar, borderColor: cardBg }} />
           ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={32} color="#9ca3af" />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: inputBg, borderColor: cardBg }]}>
+              <Ionicons name="person" size={32} color={subtleText} />
             </View>
           )}
         </View>
 
         <View style={styles.requestInfo}>
-          <ThemedText style={styles.friendName}>
+          <ThemedText style={{ ...styles.friendName, color: text }}>
             {displayName}
           </ThemedText>
           {profile.email && (
-            <ThemedText style={styles.friendBio} numberOfLines={1}>
+            <ThemedText style={{ ...styles.friendBio, color: subtleText }} numberOfLines={1}>
               {profile.email}
             </ThemedText>
           )}
-          <ThemedText style={styles.requestTime}>
+          <ThemedText style={{ ...styles.requestTime, color: '#f59e0b' }}>
             Đã gửi lời mời kết bạn
           </ThemedText>
 
           <View style={styles.requestActions}>
             <Pressable
-              style={styles.acceptButton}
+              style={({ pressed }) => ({
+                ...styles.acceptButton,
+                backgroundColor: '#10b981',
+                opacity: pressed ? 0.7 : 1
+              })}
               onPress={() => acceptFriendRequest(item.id, item.user_id)}
             >
               <Text style={styles.acceptButtonText}>Chấp nhận</Text>
             </Pressable>
 
             <Pressable
-              style={styles.rejectButton}
+              style={({ pressed }) => ({
+                ...styles.rejectButton,
+                backgroundColor: inputBg,
+                opacity: pressed ? 0.7 : 1
+              })}
               onPress={() => rejectFriendRequest(item.id)}
             >
-              <Text style={styles.rejectButtonText}>Từ chối</Text>
+              <Text style={{ ...styles.rejectButtonText, color: subtleText }}>Từ chối</Text>
             </Pressable>
           </View>
         </View>
@@ -587,20 +617,28 @@ export default function SocialScreen() {
           return (
             <View style={styles.buttonGroup}>
               <Pressable 
-                style={[styles.actionButton, styles.messageButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: inputBg,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => router.push(`/chat/${item.user_id}` as any)}
               >
-                <Ionicons name="chatbubble" size={16} color="#1877f2" />
-                <ThemedText style={[styles.buttonText, styles.messageButtonText]}>
+                <Ionicons name="chatbubble" size={16} color={accentColor} />
+                <ThemedText style={[styles.buttonText, { color: accentColor }]}>
                   Nhắn tin
                 </ThemedText>
               </Pressable>
               <Pressable 
-                style={[styles.actionButton, styles.friendsButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: inputBg,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => router.push(`/friend-profile/${item.user_id}` as any)}
               >
                 <Ionicons name="person" size={16} color="#42b883" />
-                <ThemedText style={[styles.buttonText, styles.friendsButtonText]}>
+                <ThemedText style={[styles.buttonText, { color: '#42b883' }]}>
                   Xem hồ sơ
                 </ThemedText>
               </Pressable>
@@ -611,11 +649,15 @@ export default function SocialScreen() {
           return (
             <View style={styles.buttonGroup}>
               <Pressable 
-                style={[styles.actionButton, styles.cancelButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: inputBg,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => cancelFriendRequest(item.user_id)}
               >
-                <Ionicons name="close" size={16} color="#65676b" />
-                <ThemedText style={[styles.buttonText, styles.cancelButtonText]}>
+                <Ionicons name="close" size={16} color={subtleText} />
+                <ThemedText style={[styles.buttonText, { color: subtleText }]}>
                   Hủy lời mời
                 </ThemedText>
               </Pressable>
@@ -626,7 +668,11 @@ export default function SocialScreen() {
           return (
             <View style={styles.buttonGroup}>
               <Pressable 
-                style={[styles.actionButton, styles.addFriendButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: accentColor,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => acceptFriendRequestFromSearch(item.user_id)}
               >
                 <Ionicons name="checkmark" size={16} color="#fff" />
@@ -635,11 +681,15 @@ export default function SocialScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable 
-                style={[styles.actionButton, styles.cancelButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: inputBg,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => rejectFriendRequestFromSearch(item.user_id)}
               >
-                <Ionicons name="close" size={16} color="#65676b" />
-                <ThemedText style={[styles.buttonText, styles.cancelButtonText]}>
+                <Ionicons name="close" size={16} color={subtleText} />
+                <ThemedText style={[styles.buttonText, { color: subtleText }]}>
                   Từ chối
                 </ThemedText>
               </Pressable>
@@ -648,9 +698,13 @@ export default function SocialScreen() {
         case "blocked":
           return (
             <View style={styles.buttonGroup}>
-              <Pressable style={[styles.actionButton, styles.blockedButtonStyle]}>
+              <Pressable style={({ pressed }) => ({
+                ...styles.actionButton,
+                backgroundColor: '#ffebee',
+                opacity: pressed ? 0.7 : 1
+              })}>
                 <Ionicons name="ban" size={16} color="#e41e3f" />
-                <ThemedText style={[styles.buttonText, styles.blockedButtonText]}>
+                <ThemedText style={[styles.buttonText, { color: '#e41e3f' }]}>
                   Đã chặn
                 </ThemedText>
               </Pressable>
@@ -660,7 +714,11 @@ export default function SocialScreen() {
           return (
             <View style={styles.buttonGroup}>
               <Pressable
-                style={[styles.actionButton, styles.addFriendButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: accentColor,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => sendFriendRequest(item.user_id)}
               >
                 <Ionicons name="person-add" size={16} color="#fff" />
@@ -669,11 +727,15 @@ export default function SocialScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable 
-                style={[styles.actionButton, styles.messageButton]}
+                style={({ pressed }) => ({
+                  ...styles.actionButton,
+                  backgroundColor: inputBg,
+                  opacity: pressed ? 0.7 : 1
+                })}
                 onPress={() => router.push(`/profile/${item.user_id}` as any)}
               >
-                <Ionicons name="person" size={16} color="#1877f2" />
-                <ThemedText style={[styles.buttonText, styles.messageButtonText]}>
+                <Ionicons name="person" size={16} color={accentColor} />
+                <ThemedText style={[styles.buttonText, { color: accentColor }]}>
                   Xem hồ sơ
                 </ThemedText>
               </Pressable>
@@ -683,28 +745,28 @@ export default function SocialScreen() {
     };
 
     return (
-      <View style={styles.searchCard}>
+      <View style={{ ...styles.searchCard, backgroundColor: cardBg, borderColor: borderColor }}>
         <View style={styles.avatarContainer}>
           {item.avatar_url ? (
-            <Image source={{ uri: item.avatar_url }} style={styles.avatar} />
+            <Image source={{ uri: item.avatar_url }} style={{ ...styles.avatar, borderColor: cardBg }} />
           ) : (
-            <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Ionicons name="person" size={40} color="#9ca3af" />
+            <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: inputBg, borderColor: cardBg }]}>
+              <Ionicons name="person" size={40} color={subtleText} />
             </View>
           )}
         </View>
 
         <View style={styles.searchInfo}>
-          <ThemedText style={styles.friendName}>
+          <ThemedText style={{ ...styles.friendName, color: text }}>
             {displayName}
           </ThemedText>
           {item.bio && (
-            <ThemedText style={styles.friendBio} numberOfLines={1}>
+            <ThemedText style={{ ...styles.friendBio, color: subtleText }} numberOfLines={1}>
               {item.bio}
             </ThemedText>
           )}
           {item.email && (
-            <ThemedText style={styles.friendEmail} numberOfLines={1}>
+            <ThemedText style={{ ...styles.friendEmail, color: subtleText }} numberOfLines={1}>
               {item.email}
             </ThemedText>
           )}
@@ -737,9 +799,9 @@ export default function SocialScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: screenBg }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={{ ...styles.header, backgroundColor: cardBg, borderBottomColor: borderColor }}>
         <ThemedText style={styles.headerTitle}>Bạn bè</ThemedText>
         <View style={styles.headerButtons}>
           {isAdmin && (
@@ -752,7 +814,7 @@ export default function SocialScreen() {
           )}
           <Link href="/chat/messages" asChild>
             <Pressable style={styles.headerButton}>
-              <Ionicons name="chatbubbles-outline" size={28} color="#6366f1" />
+              <Ionicons name="chatbubbles-outline" size={28} color={accentColor} />
             </Pressable>
           </Link>
           <Pressable 
@@ -763,51 +825,63 @@ export default function SocialScreen() {
               }
             }}
           >
-            <Ionicons name="person-circle-outline" size={28} color="#6366f1" />
+            <Ionicons name="person-circle-outline" size={28} color={accentColor} />
           </Pressable>
         </View>
       </View>
 
       {/* Tabs */}
-      <View style={styles.tabs}>
+      <View style={{ ...styles.tabs, backgroundColor: cardBg, borderBottomColor: borderColor }}>
         <Pressable
-          style={[styles.tab, activeTab === "friends" && styles.tabActive]}
+          style={({ pressed }) => ({
+            ...styles.tab,
+            backgroundColor: activeTab === "friends" ? accentColor + '20' : 'transparent',
+            opacity: pressed ? 0.7 : 1
+          })}
           onPress={() => setActiveTab("friends")}
         >
           <ThemedText
-            style={[styles.tabText, activeTab === "friends" && styles.tabTextActive]}
+            style={[styles.tabText, { color: activeTab === "friends" ? accentColor : subtleText }]}
           >
             Bạn bè
           </ThemedText>
           {friends.length > 0 && (
-            <View style={styles.badge}>
+            <View style={{ ...styles.badge, backgroundColor: accentColor }}>
               <Text style={styles.badgeText}>{friends.length}</Text>
             </View>
           )}
         </Pressable>
 
         <Pressable
-          style={[styles.tab, activeTab === "requests" && styles.tabActive]}
+          style={({ pressed }) => ({
+            ...styles.tab,
+            backgroundColor: activeTab === "requests" ? accentColor + '20' : 'transparent',
+            opacity: pressed ? 0.7 : 1
+          })}
           onPress={() => setActiveTab("requests")}
         >
           <ThemedText
-            style={[styles.tabText, activeTab === "requests" && styles.tabTextActive]}
+            style={[styles.tabText, { color: activeTab === "requests" ? accentColor : subtleText }]}
           >
             Lời mời
           </ThemedText>
           {requests.length > 0 && (
-            <View style={[styles.badge, styles.badgeAlert]}>
+            <View style={{ ...styles.badge, backgroundColor: '#ef4444' }}>
               <Text style={styles.badgeText}>{requests.length}</Text>
             </View>
           )}
         </Pressable>
 
         <Pressable
-          style={[styles.tab, activeTab === "search" && styles.tabActive]}
+          style={({ pressed }) => ({
+            ...styles.tab,
+            backgroundColor: activeTab === "search" ? accentColor + '20' : 'transparent',
+            opacity: pressed ? 0.7 : 1
+          })}
           onPress={() => setActiveTab("search")}
         >
           <ThemedText
-            style={[styles.tabText, activeTab === "search" && styles.tabTextActive]}
+            style={[styles.tabText, { color: activeTab === "search" ? accentColor : subtleText }]}
           >
             Tìm kiếm
           </ThemedText>
@@ -816,12 +890,13 @@ export default function SocialScreen() {
 
       {/* Search Bar (only visible in search tab) */}
       {activeTab === "search" && (
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search" size={20} color="#9ca3af" />
+        <View style={{ ...styles.searchContainer, backgroundColor: cardBg }}>
+          <View style={{ ...styles.searchBar, backgroundColor: inputBg, borderColor: borderColor }}>
+            <Ionicons name="search" size={20} color={subtleText} />
             <TextInput
-              style={styles.searchInput}
+              style={{ ...styles.searchInput, color: text }}
               placeholder="Tìm kiếm bạn bè..."
+              placeholderTextColor={subtleText}
               value={searchQuery}
               onChangeText={(text) => {
                 setSearchQuery(text);
@@ -833,7 +908,7 @@ export default function SocialScreen() {
                 setSearchQuery("");
                 setSearchResults([]);
               }}>
-                <Ionicons name="close-circle" size={20} color="#9ca3af" />
+                <Ionicons name="close-circle" size={20} color={subtleText} />
               </Pressable>
             )}
           </View>
@@ -843,7 +918,7 @@ export default function SocialScreen() {
       {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#6366f1" />
+          <ActivityIndicator size="large" color={accentColor} />
         </View>
       ) : (
         <FlatList
@@ -862,7 +937,7 @@ export default function SocialScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconContainer}>
+              <View style={{ ...styles.emptyIconContainer, backgroundColor: inputBg, borderColor: borderColor }}>
                 <Ionicons
                   name={
                     activeTab === "friends"
@@ -872,7 +947,7 @@ export default function SocialScreen() {
                       : "search-outline"
                   }
                   size={64}
-                  color="#d1d5db"
+                  color={subtleText}
                 />
               </View>
               <ThemedText style={styles.emptyTitle}>
@@ -884,7 +959,7 @@ export default function SocialScreen() {
                   ? "Không tìm thấy kết quả"
                   : "Tìm kiếm bạn bè"}
               </ThemedText>
-              <ThemedText style={styles.emptyDescription}>
+              <ThemedText style={{ ...styles.emptyDescription, color: subtleText }}>
                 {activeTab === "friends"
                   ? "Hãy tìm kiếm và kết bạn với mọi người"
                   : activeTab === "requests"
@@ -902,7 +977,6 @@ export default function SocialScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fafafa",
   },
 
   // Header
@@ -912,9 +986,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     paddingVertical: 16,
-    backgroundColor: "#fff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   headerTitle: {
     fontSize: isSmallScreen ? 24 : isMediumScreen ? 26 : 28,
@@ -939,12 +1011,10 @@ const styles = StyleSheet.create({
   // Tabs
   tabs: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     paddingHorizontal: isSmallScreen ? 12 : isMediumScreen ? 16 : 20,
     paddingVertical: 12,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   tab: {
     flex: 1,
@@ -957,18 +1027,16 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabActive: {
-    backgroundColor: "#eef2ff",
+    // backgroundColor applied inline
   },
   tabText: {
     fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 15,
     fontWeight: "700",
-    color: "#6b7280",
   },
   tabTextActive: {
-    color: "#6366f1",
+    // color applied inline
   },
   badge: {
-    backgroundColor: "#6366f1",
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -976,7 +1044,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   badgeAlert: {
-    backgroundColor: "#ef4444",
+    // backgroundColor applied inline
   },
   badgeText: {
     color: "#fff",
@@ -988,23 +1056,19 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: isSmallScreen ? 16 : isMediumScreen ? 20 : 24,
     paddingVertical: 12,
-    backgroundColor: "#fff",
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9fafb",
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: "#111827",
   },
 
   // List
@@ -1017,7 +1081,6 @@ const styles = StyleSheet.create({
   friendCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
     borderRadius: 20,
     padding: isSmallScreen ? 14 : isMediumScreen ? 16 : 18,
     gap: 14,
@@ -1027,7 +1090,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#f3f4f6",
   },
   avatarContainer: {
     position: "relative",
@@ -1037,10 +1099,8 @@ const styles = StyleSheet.create({
     height: isSmallScreen ? 60 : isMediumScreen ? 64 : 68,
     borderRadius: isSmallScreen ? 30 : isMediumScreen ? 32 : 34,
     borderWidth: 2,
-    borderColor: "#fff",
   },
   avatarPlaceholder: {
-    backgroundColor: "#f3f4f6",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1052,11 +1112,9 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 2,
     letterSpacing: -0.3,
-    color: "#1c1e21",
   },
   friendBio: {
     fontSize: isSmallScreen ? 13 : isMediumScreen ? 14 : 14,
-    color: "#65676b",
     lineHeight: 18,
     marginBottom: 2,
   },
@@ -1064,7 +1122,6 @@ const styles = StyleSheet.create({
   // Request Card
   requestCard: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     borderRadius: 20,
     padding: isSmallScreen ? 14 : isMediumScreen ? 16 : 18,
     gap: 14,
@@ -1074,14 +1131,12 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 2,
-    borderColor: "#fef3c7",
   },
   requestInfo: {
     flex: 1,
   },
   requestTime: {
     fontSize: 13,
-    color: "#f59e0b",
     marginBottom: 12,
     fontWeight: "600",
   },
@@ -1091,7 +1146,6 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     flex: 1,
-    backgroundColor: "#10b981",
     borderRadius: 12,
     paddingVertical: 10,
     alignItems: "center",
@@ -1103,13 +1157,11 @@ const styles = StyleSheet.create({
   },
   rejectButton: {
     flex: 1,
-    backgroundColor: "#f3f4f6",
     borderRadius: 12,
     paddingVertical: 10,
     alignItems: "center",
   },
   rejectButtonText: {
-    color: "#6b7280",
     fontSize: 14,
     fontWeight: "800",
   },
@@ -1118,7 +1170,6 @@ const styles = StyleSheet.create({
   searchCard: {
     flexDirection: "row",
     alignItems: "flex-start",
-    backgroundColor: "#fff",
     borderRadius: 12,
     padding: isSmallScreen ? 12 : isMediumScreen ? 14 : 16,
     marginBottom: 8,
@@ -1128,7 +1179,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: "#e4e6ea",
   },
   searchInfo: {
     flex: 1,
@@ -1136,12 +1186,10 @@ const styles = StyleSheet.create({
   },
   friendEmail: {
     fontSize: 13,
-    color: "#65676b",
     marginTop: 2,
   },
   mutualFriends: {
     fontSize: 12,
-    color: "#65676b",
     marginTop: 4,
     fontWeight: "500",
   },
@@ -1169,7 +1217,7 @@ const styles = StyleSheet.create({
 
   // Add Friend Button (Blue like Facebook)
   addFriendButton: {
-    backgroundColor: "#1877f2",
+    // backgroundColor applied inline
   },
   addFriendButtonText: {
     color: "#fff",
@@ -1177,34 +1225,34 @@ const styles = StyleSheet.create({
 
   // Message Button
   messageButton: {
-    backgroundColor: "#e4e6ea",
+    // backgroundColor applied inline
   },
   messageButtonText: {
-    color: "#1877f2",
+    // color applied inline
   },
 
   // Friends Button (Green)
   friendsButton: {
-    backgroundColor: "#e7f3ff",
+    // backgroundColor applied inline
   },
   friendsButtonText: {
-    color: "#42b883",
+    // color applied inline
   },
 
   // Cancel Button
   cancelButton: {
-    backgroundColor: "#f0f2f5",
+    // backgroundColor applied inline
   },
   cancelButtonText: {
-    color: "#65676b",
+    // color applied inline
   },
 
   // Blocked Button
   blockedButtonStyle: {
-    backgroundColor: "#ffebee",
+    // backgroundColor applied inline
   },
   blockedButtonText: {
-    color: "#e41e3f",
+    // color applied inline
   },
 
   // Empty State
@@ -1222,12 +1270,10 @@ const styles = StyleSheet.create({
     width: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
     height: isSmallScreen ? 100 : isMediumScreen ? 110 : 120,
     borderRadius: isSmallScreen ? 50 : isMediumScreen ? 55 : 60,
-    backgroundColor: "#f9fafb",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
     borderWidth: 3,
-    borderColor: "#f3f4f6",
   },
   emptyTitle: {
     fontSize: isSmallScreen ? 18 : isMediumScreen ? 20 : 22,
@@ -1238,32 +1284,29 @@ const styles = StyleSheet.create({
   },
   emptyDescription: {
     fontSize: isSmallScreen ? 14 : isMediumScreen ? 14 : 15,
-    color: "#9ca3af",
     textAlign: "center",
     lineHeight: 22,
   },
 
   // Friendship Status Buttons
   friendButton: {
-    backgroundColor: "#10b981",
+    // backgroundColor applied inline
   },
   pendingButton: {
-    backgroundColor: "#f59e0b",
+    // backgroundColor applied inline
   },
   blockedButton: {
-    backgroundColor: "#ef4444",
+    // backgroundColor applied inline
   },
 
   // Status Text
   statusText: {
     fontSize: 12,
-    color: "#f59e0b",
     fontWeight: "600",
     marginTop: 2,
   },
   statusTextGreen: {
     fontSize: 12,
-    color: "#10b981",
     fontWeight: "600",
     marginTop: 2,
   },
