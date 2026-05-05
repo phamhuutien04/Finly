@@ -73,7 +73,7 @@ export default function CategoriesScreen() {
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedDay, setSelectedDay] = useState(currentDay);
-  const [filterMode, setFilterMode] = useState<"today" | "month" | "year" | "custom">("month");
+  const [filterMode, setFilterMode] = useState<"today" | "week" | "month" | "year" | "custom">("month");
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryRow | null>(null);
@@ -98,6 +98,18 @@ export default function CategoriesScreen() {
     if (filterMode === "today") {
       start = new Date(selectedYear, selectedMonth - 1, selectedDay, 0, 0, 0);
       end = new Date(selectedYear, selectedMonth - 1, selectedDay, 23, 59, 59, 999);
+    } else if (filterMode === "week") {
+      // Tính tuần hiện tại (từ thứ 2 đến chủ nhật)
+      const today = new Date(selectedYear, selectedMonth - 1, selectedDay);
+      const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+      const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Tính khoảng cách đến thứ 2
+      start = new Date(today);
+      start.setDate(today.getDate() + diff);
+      start.setHours(0, 0, 0, 0);
+      
+      end = new Date(start);
+      end.setDate(start.getDate() + 6); // Chủ nhật
+      end.setHours(23, 59, 59, 999);
     } else if (filterMode === "month") {
       start = new Date(selectedYear, selectedMonth - 1, 1);
     } else if (filterMode === "year") {
@@ -416,6 +428,13 @@ export default function CategoriesScreen() {
     setSelectedDay(currentDay);
   };
 
+  const setFilterThisWeek = () => {
+    setFilterMode("week");
+    setSelectedYear(currentYear);
+    setSelectedMonth(currentMonth);
+    setSelectedDay(currentDay);
+  };
+
   const setFilterThisMonth = () => {
     setFilterMode("month");
     setSelectedYear(currentYear);
@@ -459,7 +478,7 @@ export default function CategoriesScreen() {
             <View style={{ ...styles.statsCard, backgroundColor: cardBg, borderColor: borderColor }}>
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
-                  <ThemedText style={styles.statLabel}>Thu nhập</ThemedText>
+              <ThemedText style={[styles.statLabel, { color: subtleText }]}>Thu nhập</ThemedText>
                   <ThemedText style={[styles.statValue, { color: "#10b981" }]}>
                     {formatVND(totalIncome)}
                   </ThemedText>
@@ -468,7 +487,7 @@ export default function CategoriesScreen() {
                 <View style={styles.statDivider} />
 
                 <View style={styles.statBox}>
-                  <ThemedText style={styles.statLabel}>Chi tiêu</ThemedText>
+                  <ThemedText style={[styles.statLabel, { color: subtleText }]}>Chi tiêu</ThemedText>
                   <ThemedText style={[styles.statValue, { color: "#ef4444" }]}>
                     {formatVND(totalExpense)}
                   </ThemedText>
@@ -479,21 +498,62 @@ export default function CategoriesScreen() {
             <View style={styles.quickFilters}>
               <Pressable
                 onPress={setFilterToday}
-                style={{ ...styles.filterChip, ...(filterMode === "today" && { backgroundColor: accentColor, borderColor: accentColor }) }}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  { 
+                    backgroundColor: filterMode === "today" ? accentColor : cardBg,
+                    borderColor: filterMode === "today" ? accentColor : borderColor,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
               >
                 <ThemedText
-                  style={[styles.filterChipText, filterMode === "today" && styles.filterChipTextActive]}
+                  style={[
+                    styles.filterChipText, 
+                    { color: filterMode === "today" ? "#ffffff" : text }
+                  ]}
                 >
                   Hôm nay
                 </ThemedText>
               </Pressable>
 
               <Pressable
-                onPress={setFilterThisMonth}
-                style={{ ...styles.filterChip, ...(filterMode === "month" && { backgroundColor: accentColor, borderColor: accentColor }) }}
+                onPress={setFilterThisWeek}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  { 
+                    backgroundColor: filterMode === "week" ? accentColor : cardBg,
+                    borderColor: filterMode === "week" ? accentColor : borderColor,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
               >
                 <ThemedText
-                  style={[styles.filterChipText, filterMode === "month" && styles.filterChipTextActive]}
+                  style={[
+                    styles.filterChipText, 
+                    { color: filterMode === "week" ? "#ffffff" : text }
+                  ]}
+                >
+                  Tuần này
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                onPress={setFilterThisMonth}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  { 
+                    backgroundColor: filterMode === "month" ? accentColor : cardBg,
+                    borderColor: filterMode === "month" ? accentColor : borderColor,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
+              >
+                <ThemedText
+                  style={[
+                    styles.filterChipText, 
+                    { color: filterMode === "month" ? "#ffffff" : text }
+                  ]}
                 >
                   Tháng này
                 </ThemedText>
@@ -501,10 +561,20 @@ export default function CategoriesScreen() {
 
               <Pressable
                 onPress={setFilterThisYear}
-                style={{ ...styles.filterChip, ...(filterMode === "year" && { backgroundColor: accentColor, borderColor: accentColor }) }}
+                style={({ pressed }) => [
+                  styles.filterChip,
+                  { 
+                    backgroundColor: filterMode === "year" ? accentColor : cardBg,
+                    borderColor: filterMode === "year" ? accentColor : borderColor,
+                    opacity: pressed ? 0.7 : 1
+                  }
+                ]}
               >
                 <ThemedText
-                  style={[styles.filterChipText, filterMode === "year" && styles.filterChipTextActive]}
+                  style={[
+                    styles.filterChipText, 
+                    { color: filterMode === "year" ? "#ffffff" : text }
+                  ]}
                 >
                   Năm nay
                 </ThemedText>
@@ -517,20 +587,22 @@ export default function CategoriesScreen() {
                   onPress={() => setActiveType("expense")}
                   style={[
                     styles.toggleBtn,
+                    { backgroundColor: cardBg },
                     activeType === "expense" && styles.toggleBtnActiveExpense,
                   ]}
                 >
-                  <ThemedText style={styles.toggleText}>Chi tiêu</ThemedText>
+                  <ThemedText style={[styles.toggleText, { color: text }]}>Chi tiêu</ThemedText>
                 </Pressable>
 
                 <Pressable
                   onPress={() => setActiveType("income")}
                   style={[
                     styles.toggleBtn,
+                    { backgroundColor: cardBg },
                     activeType === "income" && styles.toggleBtnActiveIncome,
                   ]}
                 >
-                  <ThemedText style={styles.toggleText}>Thu nhập</ThemedText>
+                  <ThemedText style={[styles.toggleText, { color: text }]}>Thu nhập</ThemedText>
                 </Pressable>
               </View>
             )}
@@ -546,12 +618,12 @@ export default function CategoriesScreen() {
               />
             </View>
 
-            <ThemedText style={styles.sectionTitle}>
+            <ThemedText style={[styles.sectionTitle, { color: text }]}>
               {filtered.length} danh mục
             </ThemedText>
           </>
         }
-        renderItem={({ item }) => <CategoryCard item={item} onEdit={openEdit} cardBg={cardBg} borderColor={borderColor} />}
+        renderItem={({ item }) => <CategoryCard item={item} onEdit={openEdit} cardBg={cardBg} borderColor={borderColor} text={text} subtleText={subtleText} />}
         ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
         ListEmptyComponent={
           loading ? (
@@ -561,8 +633,8 @@ export default function CategoriesScreen() {
           ) : (
             <View style={styles.emptyContainer}>
               <ThemedText style={styles.emptyIcon}>📂</ThemedText>
-              <ThemedText style={styles.emptyTitle}>Chưa có danh mục</ThemedText>
-              <ThemedText style={styles.emptyDesc}>Nhấn nút + để tạo danh mục đầu tiên</ThemedText>
+              <ThemedText style={[styles.emptyTitle, { color: text }]}>Chưa có danh mục</ThemedText>
+              <ThemedText style={[styles.emptyDesc, { color: subtleText }]}>Nhấn nút + để tạo danh mục đầu tiên</ThemedText>
             </View>
           )
         }
@@ -571,7 +643,7 @@ export default function CategoriesScreen() {
       <Modal visible={open} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <ThemedView style={styles.modalContent}>
-            <ThemedText style={styles.modalTitle}>
+            <ThemedText style={[styles.modalTitle, { color: text }]}>
               {editing ? "Sửa danh mục" : "Thêm danh mục"}
             </ThemedText>
 
@@ -586,7 +658,7 @@ export default function CategoriesScreen() {
                     editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={styles.modalTypeText}>Chi tiêu</ThemedText>
+                  <ThemedText style={[styles.modalTypeText, { color: text }]}>Chi tiêu</ThemedText>
                 </Pressable>
 
                 <Pressable
@@ -598,7 +670,7 @@ export default function CategoriesScreen() {
                     editing && { opacity: 0.6 },
                   ]}
                 >
-                  <ThemedText style={styles.modalTypeText}>Thu nhập</ThemedText>
+                  <ThemedText style={[styles.modalTypeText, { color: text }]}>Thu nhập</ThemedText>
                 </Pressable>
               </View>
             )}
@@ -625,7 +697,7 @@ export default function CategoriesScreen() {
 
             <View style={styles.iconSection}>
               <View style={styles.iconHeader}>
-                <ThemedText style={styles.iconLabel}>Icon</ThemedText>
+                <ThemedText style={[styles.iconLabel, { color: text }]}>Icon</ThemedText>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <Pressable onPress={pickFromLibrary} style={styles.iconBtn}>
                     <ThemedText style={styles.iconBtnText}>Chọn ảnh</ThemedText>
@@ -665,13 +737,13 @@ export default function CategoriesScreen() {
             </View>
 
             <View style={styles.modalButtons}>
-              <Pressable
-                onPress={() => setOpen(false)}
-                style={styles.modalBtnCancel}
-                disabled={saving}
-              >
-                <ThemedText style={styles.modalBtnCancelText}>Hủy</ThemedText>
-              </Pressable>
+                <Pressable
+                  onPress={() => setOpen(false)}
+                  style={styles.modalBtnCancel}
+                  disabled={saving}
+                >
+                  <ThemedText style={[styles.modalBtnCancelText, { color: text }]}>Hủy</ThemedText>
+                </Pressable>
 
               <Pressable
                 onPress={onSave}
@@ -692,11 +764,13 @@ export default function CategoriesScreen() {
   );
 }
 
-function CategoryCard({ item, onEdit, cardBg, borderColor }: { 
+function CategoryCard({ item, onEdit, cardBg, borderColor, text, subtleText }: { 
   item: CategoryRow; 
   onEdit: (c: CategoryRow) => void;
   cardBg: string;
   borderColor: string;
+  text: string;
+  subtleText: string;
 }) {
   const isIncome = normalizeType(item.type) === "income";
 
@@ -734,7 +808,7 @@ function CategoryCard({ item, onEdit, cardBg, borderColor }: {
         </View>
 
         {/* Tên danh mục */}
-        <ThemedText style={styles.categoryName} numberOfLines={1}>
+        <ThemedText style={[styles.categoryName, { color: text }]} numberOfLines={1}>
           {item.name ?? `#${item.id}`}
         </ThemedText>
 
@@ -749,7 +823,7 @@ function CategoryCard({ item, onEdit, cardBg, borderColor }: {
             },
           ]}
         >
-          <ThemedText style={styles.categoryBadgeText}>
+          <ThemedText style={[styles.categoryBadgeText, { color: isIncome ? "#10b981" : "#ef4444" }]}>
             {isIncome ? "Thu" : "Chi"}
           </ThemedText>
         </View>
@@ -822,7 +896,6 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    opacity: 0.7,
     fontWeight: "600",
     marginBottom: 4,
   },
@@ -841,24 +914,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
     marginBottom: 20,
+    flexWrap: "wrap",
   },
   filterChip: {
     flex: 1,
+    minWidth: "22%",
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'transparent',
     alignItems: "center",
   },
   filterChipText: {
     fontSize: 13,
     fontWeight: "600",
-    opacity: 0.8,
-  },
-  filterChipTextActive: {
-    color: "white",
-    opacity: 1,
   },
 
   typeToggle: {
@@ -908,7 +977,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: "600",
-    opacity: 0.7,
     marginBottom: 12,
   },
 
